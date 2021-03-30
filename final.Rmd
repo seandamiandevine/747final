@@ -7,7 +7,7 @@ output:
   html_notebook: default
 ---
 
-``` {r, echo=F} 
+``` {r initialize equation count, echo=F} 
 eqnum = 0
 ```
 
@@ -22,14 +22,17 @@ In this tutorial, I want do to four things:
 
 * Apply all of these techniques to data I collected about people's effort preferences. 
 
-A quick word about notation. Throughout the tutorial, I will use various equations to represent the variables I will be discussing. Greek letters ($\beta$, $\gamma$, etc.) are used to represent individual parameters, whereas bold Arabic letters (**X**, **B**) represent matrices of parameters. We haven't seen in class how to represent regressions or multilevel models in matrix notation, which is unfortunate because it is very useful for representing categorical variables and often comes up in the literature. A full review of matrix notation for MLM is out of the scope of the current tutorial, but for pedagogical purposes, I added a supplement at the end that goes through representing multilevel models this way. This is optional reading for those who are interested and does not really bare on the rest of the tutorial.
+To do so, I will first introduce the theory underlying logistic (multilevel) regression. Then I will describe the data set we will be working with, along with the hypotheses and research question. Next I will fit a series of logisitc MLM to test these hypothesis and will conclude by demonstrating how to test assumptions on these models. 
 
-# Logistic Regressions, Probabilities, and Odds Ratios 
-Logistic regressions are regression models used to model data when the outcome variable is binary. Binary variables are useful for measuring many variables of interest in psychology: whether a professor has tenure or not, someone's biological sex, and, as we will see, choices in a decision-making experiment. The problem is that the models we have seen in class are *linear* multilevel models. In other words, they are models where you have to be able to draw a line between two points. When we have binary data, this is a problem. 
+All data for this tutorial are available on my [github](https://github.com/seandamiandevine/747final). 
+
+# Logistic Regressions, Probabilities, and Odds Ratios
+## Basics of Logistic Regressions
+Logistic regressions are a specicial case of general linear regression models used to model data when the outcome variable is binary. Binary variables are useful for measuring many variables of interest in psychology: whether a professor has tenure or not, someone's biological sex, and, as we will see, choices in a decision-making experiment. The problem is that the models we have seen in class are *linear* multilevel models. In other words, they are models where you have to be able to draw a line between data points. When we have binary data, this is a problem. 
 
 To illustrate this, let's work with the following (made-up) example. Imagine we collect data on whether someone will answer "yes" or "no" to the question: "Will you go on a data with me?" We predict that their answer will depend on how beautiful the person asking is (0 = not beautiful at all to 200 = very beautiful). **Figure 1a** shows what these data might look like^[These data are simulated. Hopefully people are not this shallow in real life.]. 
 
-```{r, echo=F, fig.height=6, fig.align='center', fig.cap='From binary data to linear models.'}
+```{r beauty example plots, echo=F, fig.height=6, fig.align='center', fig.cap='From binary data to linear models.'}
 probs = seq(0, 1, by=0.05)
 choices = sapply(1:length(probs), function(x) sample(c(0, 1), size=10, 
                                                      prob=c(1-probs[x], probs[x]), 
@@ -86,7 +89,7 @@ $$
 \tag{`r  eqnum=eqnum+1; eqnum`}
 Date_{i} = \beta_0 + \beta_1Beauty_i
 $$
-At first glance, this approach might seem reasonable: better-looking people get more dates. There are two problems, however. First, some values on the regression line are impossible. What would it mean to be halfway between "yes" and "no"? Second, this model predicts that some of the values will exceed 0 or 1 in either direction, which doesn't make sense: how can we say "more than yes" to a date?
+At first glance, this approach might seem reasonable: better-looking people get more dates. There are two problems, however. The first is rather intuitive: some values on the regression line are impossible. What would it mean for a value to exceed 1; to say "more than yes" to a date. The second is slightly more techincal. In linear regression, the variance is estimated as a free parameter ($\sigma^2$ or $\Lambda$ for a covariance matrix), but in logistic regression the variance *depends on* on the mean (i.e., the probability of an event occuring, $p$), such that $var(y_{ij}) = p(1-p)$. This means that by definition there is heteroscedasticity, because the variance is not constant across observations, which is an assumption of linear regression. 
 
 Still, there is something intuitive about the linear approach. In fact, if we changed the y-axis so that these impossible values went away, we would have something that makes sense. To solve this problem, we can estimate the *probability* of someone saying yes to a date, rather than the binary answer. This would fixe both our problems, because probabilities are bound from 0 to 1 and are interpretable in a continuous manner. The question is how do we move from binary data to probabalistic data? Fortunately, we can use a *logistic* function to do so: 
 
@@ -97,7 +100,7 @@ $$
 
 The logistic function^[$e$ here is Euleur's constant, which is approximately equal to 2.718282] squeezes the output from our linear model to be between between 0 and 1, which we use to represent probabilities of responding. As an input, it takes $\eta$, which in our regression framework is the predicted value of $y$ from our linear model (i.e., the result of $\beta_0 + \beta_1Beauty_i$). We can see what this function looks like for our data in **Figure 1c**. The characteristic *S-curve* better represents our earlier intuition: the better-looking someone is, the higher probability with which they'll get a date. 
 
-While transforming our data using a logistic function fixes our the issue of impossible values on our regression line, we have lost the nice linear function we had in **Figure 1b**. As such, we cannot apply the (multilevel) *linear* techniques we have learned in class and previously in our statistical training. To move from this non-linear logistic function to a linear one, we have to "invert" this logistic function to recover the linear relationship we lost. In other words, we want to get back to something like $Date_i = \beta_0 + \beta_1Beauty_i$, while keeping interpretable values for every predicted value of $Date_i$ (i.e., keeping probabilities as our y-axis). To do so, we can use the following equation. 
+While transforming our data using a logistic function fixes our the issue of impossible values on our regression line, we have lost the nice linear function we had in **Figure 1b**. As such, we cannot apply the (multilevel) *linear* techniques we have learned in class and previously in our statistical training. To move from this non-linear logistic function to a linear one, we have to "invert" this logistic function to recover the linear relationship we lost. In other words, we want to get back to something like $Date_i = \beta_0 + \beta_1Beauty_i$, while keeping interpretable values for every predicted value of $Date_i$ and solving the issue of heteroscedasticity. To do so, we can use the following equation. 
 
 $$ 
 \tag{`r  eqnum=eqnum+1; eqnum`}
@@ -106,14 +109,35 @@ $$
 
 Now, our outcome is no longer the probability that $y_i = 1$, but instead the the **log odds of $y_i$ being equal to 1** (which in this case means saying "yes" to a date). This is simply the natural logarithm of the probability that $y_i = 1$ (which we got from our sigmoidal function earlier) over the probability that $y_i \neq 1$. Therefore, we can easily move from log odds (LOR) to regular odds ratios (OR) to probability as follows:
 
-
 \begin{gather}
 LOR = log\left(\frac{p(y_i = 1)}{p(1-y_i= 1)}\right) \tag{`r  eqnum=eqnum+1; eqnum`} \\
 OR = LOR^e \nonumber \\
 p(y_i=1) = \frac{OR}{1+OR}.\nonumber
 \end{gather}
 
-In other words, when $LOR = 0$, $OR = 1$, $p(\mathrm{\mathbf{Y}}_i=1) = 0.5$. The change in LOR will be the regression coefficients we get from a logistic regression model. In the next section, I will explain how to run a logistic regression model with multilevel data in R and we will interpret the resultant coefficients using the equations from (3)
+In other words, when $LOR = 0$, $OR = 1$, $p(\mathrm{\mathbf{Y}}_i=1) = 0.5$. The change in LOR will be the regression coefficients we get from a logistic regression model. Because this (log) logistic transformation "connects" our binomial data to linear functions, it is called a **link function**^[The logistic function is just one possible link function. Other functions, such as a probit function can do the same job of linking binomial data to linear functions (see Long, 1997)]. 
+
+## Multilevel Logistic Models
+Equation 3 can easily be exteded to multilevel data now that we have a linear function to work with. The key thing to remember is that the coefficients refer to an outcome that is transformed and not in the original metric (log odds instead of probabilities). The equation for a k-predictor multilevel logistic model, with random intercepts and random slopes, is:
+
+$$
+\tag{`r  eqnum=eqnum+1; eqnum`}
+log\left(\frac{p(y_{ij} = 1)}{p(1-y_{ij}= 1)}\right) = \\
+\gamma_{00} + \sum_{h=1}^{k}\gamma_{h0}x_{hij} + U_{0j} + U_{hj}x_{hij} + R_{ij}, \\
+$$
+
+where
+
+ - $\gamma_{00}$ is the group log odds that $y_{ij}=1$; 
+ - $\gamma_{h0}$ is the change in log odds for a one-unit increase in $x_{hij}$; 
+ - $U_{0j}$ are the cluster-level deviation from $\gamma_{00}$ on the log-odds scale. As always, $U_{0j}$ are assumed to be independent and random, $\mathcal{N}(0, \tau^2_0)$;
+ - $U_{hj}$ are the cluster-level deviation in slopes from $\gamma_{h0}$, on the log-odds scale. $U_{hj}$ are assumed to be independent and random, $\mathcal{N}(0, \tau^2_h)$;
+ 
+In equation 5, I include a term for $R_{ij}$, but as we saw earlier, level-1 residuals in logistic models are not a free parameter to be estimated, but rather depend on $y_{ij}$, such that $R_{ij} = p(y_{ij}=1)\left(1-p(y_{ij}=1)\right)$. For this reason, this term is usually dropped from equations and even excluded from the `lme4` output, as we will see. For completeness however, $R_{ij}$ refer to the within-cluster residuals, such that $y_{hij} = \hat{p}_{ij} + R_{ij}$, where $\hat{p}_{ij}$ is the model's predicted probability that $y_{ij} = 1$. A particular quirk of this definition of variance in the logistic model is that the variance about $R_{ij}$, a.k.a. $\sigma^2$, is sometimes assumed to be random independent, with mean 0 and a fixed variance of $\frac{\pi^2}{3}$. I'll explain when this assumption is appropriate and where it comes from in a later section discussing the calculation of an ICC and residual variance in logistic multilevel models, but for those who are interested, see Snijders & Bosker (2012, section 17.3.3-4). 
+
+Save for $R_{ij}$, the remaining parameters ($\gamma, \tau^2$) must be estimated. How `lme4` estimates these parameters is beyond the scope of the current tutorial, but suffice it to say that we will use the default Laplace Approximation method for the remainder of this tutorial. For more information about the computatons underlying this approximation for hiearchical data, see Raudenbush et al. (2000). 
+
+In the next section, I will explain how to run and interpret the output from a multilevel logistic regression model in R. 
 
 # Data Demo
 With the theory out of the way, we can now focus on actually modeling multilevel binary data using logistic models. 
@@ -122,7 +146,7 @@ With the theory out of the way, we can now focus on actually modeling multilevel
 The data for this tutorial comes from an experiment I ran earlier this year through Amazon Mechnical Turk (AMT). The data stored in `effort_progress_choice.csv` describes 60 participants' choices in a cognitive experiment about mental effort preference when progress feedback is present or not. 
 
 ### Study Background
-Past work has shown that people find cognitive effort aversive and,if given the option, they will avoid it (Kool et al., 2010). However, some activities (e.g., puzzle-solving, Suduko, building furniture) are performed by humans *because* they are effortful, not despite the fact (Inzlicht et al., 2018). In this study, we wanted to see whether **progress** was something that motivated people to freely choose harder mental work. The main question was whether the presence of progress feedback in a mentally demanding task would make people choose to work harder. 
+Past work has shown that people find cognitive effort aversive and,if given the option, they will avoid it (Kool et al., 2010). However, some activities (e.g., puzzle-solving, Suduko, building furniture) are performed by humans *because* they are effortful, not despite the fact (Inzlicht et al., 2018). In this study, we wanted to see whether **progress** was a feature of an effortful task that motivated people to freely choose harder mental work. The main question was whether the presence of progress feedback in a mentally demanding task would make people choose to work mentally harder. 
 
 ### Experimental Task
 The experiment consisted of a series of two repeating phases: a choice and judgement phase (see Figure 2).
@@ -133,7 +157,7 @@ In the choice phase, participants were presented with two (virtual) decks of car
 
 As a result of this design, there were six total decks (labels from A-F) participants could choose from, varying according to their associated switch rate and whether or not they produced progress feedback. 
 
-```{r, echo=F}
+```{r decks table, echo=F}
 deckdesc <- 
   data.frame(`Yields Progress` = c('A', 'B', 'C'), 
            `Does Not Yield Progress` = c('D', 'E', 'F'), 
@@ -144,10 +168,10 @@ knitr::kable(deckdesc, col.names = c('Yields Progress', 'Does Not Yield Progress
 ```
 
 
-Overall then, participants were exposed to 15 unique possible deck pairings (A vs. F, B vs. C, etc.), each of which were presented 4 times throughout the experiment. These 15 pairings were fully counterbalanced, allowing for conclusions to be drawn about participants’ pure effort preferences (when a deck choice was between two no-progress or progress decks that differed in terms of switch rate), pure progress preferences (when a deck choice was between a no-progress deck and progress deck that had the same switch rate), and the interaction between the two (when a deck choice was between a no-progress deck and a progress deck that varied in terms of switch rate). 
+Overall then, participants were exposed to 15 unique possible deck pairings (A vs. F, B vs. C, etc.), each of which were presented 4 times throughout the experiment. These 15 pairings were fully counterbalanced, allowing for conclusions to be drawn about participants’ pure effort preferences (when a deck choice was between two no-progress or two progress decks that differed only in terms of switch rate), pure progress preferences (when a deck choice was between a no-progress deck and progress deck that had the same switch rate), and the interaction between the two (when a deck choice was between a no-progress deck and a progress deck that varied in terms of switch rate). 
 
 ### Research Question
-In summary, what we are trying to answer is whether people are willing to work mentally harder when that mental effort explicitly conveys progress information. To wit, the key variables of interest for this tutorial are participants' choices (high/low demand deck; progress/no prorgess deck) and how these choices varied as a function of what deck pairings they were choosen from. Specifically, we will try to model whether participants' were more likely to choose one type of deck over another depending on (a) the demand pairing (how hard each available deck was) and (b) the progress pairing (whether one, both, or none of the decks gave progress feedback) on a given trial. 
+In summary, what we are trying to answer is whether people are willing to work mentally harder when that mental effort explicitly conveys progress information. To wit, the key variables of interest for this tutorial are participants' choices (high/low demand deck) and how these choices varied as a function of what deck pairings they were choosen from. Specifically, we will try to model whether participants' were more likely to choose one type of deck over another depending on (a) the demand pairing (how hard each available deck was) and (b) the progress pairing (whether one, both, or none of the decks gave progress feedback) on a given trial. 
 
 <center>
 
@@ -156,20 +180,18 @@ In summary, what we are trying to answer is whether people are willing to work m
 </center>
 
 ### Hypotheses
-We had three hypotheses before collecting the data: 
+In this tutorial, we will only focus on a subset of the collected data; specifically, those that concern people's effort preference. We had two effort-related hypotheses before collecting the data: 
 
-* **H1**: There would be a main effect of demand pairing (IV) on effort choices (DV), such that, holding progress constant, people would select low demand decks more often than chance. 
+* **H1. People are effort-avoidant**: People would prefer low demand decks more than chance overall.
 
-* **H2**: There would be a main effect of progress pairing (IV) on effort choices (DV), such that, holding demand constant, people would select progress decks more often than chance. 
-
-* **H3**: There would be an interaction between progress pairing (IV1) and effort pairing (IV2) on effort choices (DV), such that people would select high demand decks more often than chance when they confered progress and less often when they didn’t. 
+* **H2. Effort avoidance is moderated by progress feedback**: People would be indifferent or even prefer high demand decks when demand was paired with progress information. When progress was paired with low demand, people would prefer low demand decks. 
 
 ## Data Preperation and Organization
 As you may have gathered from the previous section, all the data in this tutorial are *categorical*. The outcome (participants' choices) are binary (high effort/low effort; progress/no progress) and the predictors are the different types of deck pairings someone could choose from (e.g., deck A vs. D, as shown in **Figure 2**). So what do these data look like and how do we model them?
 
 First, we need to load the data. 
 
-```{r, echo=T}
+```{r load data, echo=T}
 data <- read.csv('effort_progress_choice.csv') # load the data
 head(data)                                     # take a peak
 ```
@@ -198,69 +220,62 @@ head(data)                                     # take a peak
 
 * `progchoice` is whether or not participants chose the deck that yielded progress feedback that trial (1 = yes, 0 = no);
 
-This may seem like a lot of information, but really all we are trying to do is predict `effchoice` and `progchoice` from `effort_type` and `prog_type`. From this description, it should be clear that we need a multilevel to do so, because `effchoice` and `progchoice` are both nested within participants --- that is, each participant made 60 choices.  
+This may seem like a lot of information, but really all we are trying to do is predict `effchoice` from `prog_type`. From this description, it should be clear that we need a multilevel to do so, because `effchoice` is nested within participants --- that is, each participant made 60 choices. Thus, we want to quantify whether people differ in (a) their overall effort-avoidance (re: H1) and (b) their sensitivity to progress information (re: H2).
 
-## Defining the Design Matrix
-Now that we have a sense of our data, we have to determine how to model it. Namely, we have to find a way to quantify all of these categorical predictors into numeric variables that can be included in the model. In other words, we need something that can be multiplied by our coefficients, $\gamma_{xx}$. 
+## Coding Categorical Variables
+Now that we have a sense of our data, we have to decide how to model it. Namely, we have to find a way to quantify all of these categorical predictors into numeric variables that can be included in the model. 
 
-As we learned earlier in the semester, we can assign numeric labels to categorical predictors by using a *coding scheme*. In our case, we are interested in choices within a certain deck pairing and less interested in how these deck pairings differ from each other. For this reason, we will use a **dummy coding scheme**, where a value of 1 represents that level of the category (that deck pairing) is present and 0 represents when it is not. R does this for us automatically when our variable is a factor. We can access this default dummy coding scheme using by using the contrast function. 
+To do so, we can assign numeric labels to categorical predictors by using a *coding scheme*. In our case, we are interested in how effort choices within a certain deck pairing differ from change and less interested in how these deck pairings differ from each other. For this reason, we will use a **dummy coding scheme**, where a value of 1 represents that level of the category (that deck pairing) is present and 0 represents when it is not. R does this for us automatically when our variable is a factor. We can access this default dummy coding scheme using by using the contrast function. 
 
-```{r, echo=T}
-contrasts(data$effort_type) # get dummy codes for effort_type
+```{r default contasts, echo=T}
 contrasts(data$prog_type)   # get dummy codes for prog_type
 ```
 
-From these contrasts, we can see that `HH` and `NoProg_NoProg` are our intercepts (the values when our dummy codes are all equal to zero). When we apply dummy coding in a regression model, the regression coefficients will reflect the difference in our outcome between a particular level of our predictor and this intercept. For theoretical reasons, we want to change the reference level for the `effort_type` variable to reflect the `LH` level--the comparison between the easiest and hardest decks. We do so because past work has used similar manipulations and have focused specifically on this pairing, so insofar as we are interested in differences between the pairs, we should compare to this one (Kool et al., 2010). Changing the coding scheme is easy in R: 
+From these contrasts, we can see that `NoProg_NoProg` is our intercepts (the referent when our dummy codes are all equal to zero). When we apply dummy coding in a regression model, the regression coefficients will reflect the difference in our outcome between a particular level of our predictor and this intercept. For theoretical reasons, we want to change the reference level for `prog_type` to be `NoProg_Prog` --- deck pairings where the progress deck is also the high demand deck. Why we do this will be made clear in a later section. Changing the coding scheme is easy to do in R: 
 
-```{r, echo=T}
+```{r recoding, echo=T}
 # The relevel command reconstructs the dummy coding matrix so that the chosen "ref" level is the intercept (has all 0s values)
-data$effort_type <- relevel(data$effort_type, ref = 'LH') 
-contrasts(data$effort_type) # let's take a look now
+data$prog_type <- relevel(data$prog_type, ref = 'NoProg_Prog') 
+contrasts(data$prog_type) # let's take a look now
 
 ```
-Now we can see that the intercept for `effort_type` is `LH` and intercept for `prog_type` remains `NoProg_NoProg`. 
+Now we can see that the dummy-coded intercept for `prog_type` is `NoProg_Prog`. 
 
 ## Model Specification and Hypothesis Testing
-Now that we have quantified our categorical data using dummy codes, we can fit the multilevel models. Specifically, we will estimate the probability of choosing the high demand deck or the progress deck in each of the deck pairings that address our hypotheses. We will do this for each of our hypotheses. 
+Now that we have specified our desired coding scheme, we can fit the multilevel models to test our hypotheses. 
 
 ### H1
-First we will test people's effort preferences when progress is held constant. That is, we will see if people prefer high or low demand decks when both decks yield progress or neither deck yields progress. 
-
-To do so, we first need to subset the data so as to only include trials that are relevant to H1: those where progress was held constant (where both decks either did or did not yield progress).
-
-```{r, echo =T}
-# 1. Subset the data to only include decisions relevant to H1. 
-h1.data <- data[data$prog_type %in% c('Prog_Prog', 'NoProg_NoProg'),]
-```
-
-To actually fit the model is relatively straightforward now, since the parameter of interest for H1 is $\gamma_00$: the overall log odds of participants' preferring low demand decks when progress is held constant. Thus, we can fit a null model and address our hypothesis. 
+#### Fitting the Model
+First we will test people's effort preferences overall. That is, we will see if people prefer high or low demand decks across the task. We can address this hypothesis by simply fitting a null model. 
 
 $$
 \tag{`r  eqnum=eqnum+1; eqnum`} 
-log\left(\frac{p(\mathrm{effchoice}_{trial, id} = 1)}{1-p(\mathrm{effchoice}_{trial, id}=1)}\right) = \gamma_{00} + U_{0id} + R_{trial, id}
+log\left(\frac{p(\mathrm{effchoice}_{ij} = 1)}{1-p(\mathrm{effchoice}_{ij}=1)}\right) = \gamma_{00} + U_{0j} + R_{ij}
 $$
+$\gamma_{00}$ represents the estimated log odds that participants chose the high demand task (when `effchoice` = 1) overall. This model will also estimate $\tau^2_0$, which will be the variance about $\gamma_{00}$ per participant. In other words, how much each participant's estimated probability of choosing high demand tasks differs from $\gamma_{00}$. Recall, $R_{ij}$ is actually fixed in this case and $\sigma^2 = p(effchoice_{ij})(1-p(effchoice_{ij})$. $i$ is for the $i^\mathrm{th}$ trial for the $j^\mathrm{th}$ participant.
 
-```{r, echo = T, warning=F, message=F}
+Fitting a logistic MLM in R is largely the same as fitting a linear MLM in R, with two additional rules: 
+
+* add a "g" in front of `lmer`. The g stands for "generalized", as in "generalized linear model";
+
+* include `family = 'binomial'`, which tells the model that the outcome here is binary.^[Conveniently, if either of these steps are skipped, `lme4` will throw up a warning so you don't forget!] 
+
+```{r m0 fit, echo = T, warning=F, message=F}
 # 2. Formulate a null model
 # first load lme4
 library(lme4) 
 
+# manually remove NAs-- if this is skipped, we run into problems later in the tutorial during model comparison
+data.no.na <- data[!is.na(data$effchoice), ]
+
 # fit the null model: 
-h1.0 <- glmer(effchoice ~ 1 + (1|id), data=h1.data, family = 'binomial')
-summary(h1.0)
+m0 <- glmer(effchoice ~ 1 + (1|id), data=data.no.na, family = 'binomial')
+summary(m0)
 ```
 
-Note here that to fit a logistic model with `lme4`, all you need to do is: 
+#### Interpreting the Fixed Effects
 
-* add a "g" in from of `lmer`. The g stands for "generalized", as in "generalized linear model";
-
-* make sure to include `family = 'binomial'`, which tells the model that the outcome here is binary. 
-
-Conveniently, if either of these steps are skipped, `lme4` will throw up a warning so you don't forget! 
-
-Now to the output. We can begin by interpreting the fixed effects. 
-
-Remember, $\gamma_{00}$ here represents the overall log odds of choosing the highest demand deck across participants. Using the equations we saw earlier, we can convert these log odds to probabilities: 
+Let's begin by interpreting the fixed effects. Remember, $\gamma_{00}$ here represents the overall log odds of choosing the highest demand deck across participants across trials. Using the equations we saw earlier, we can convert these log odds to probabilities: 
 
 \begin{gather}
 OR = LOR^e \nonumber \\
@@ -269,32 +284,33 @@ p(y_{ij}=1) = \frac{OR}{1+OR}.\nonumber
 
 In R we can compute this like this: 
 
-```{r, echo=T} 
-G00 = summary(h1.0)$coefficients[,'Estimate'] # this store G00
+```{r convert G00 from m0, echo=T} 
+G00 = summary(m0)$coefficients[,'Estimate'] # this stores G00
 OR = exp(G00)                                 # exp() raises whatever number to the power of e
 pY_is_1 = OR/(1+OR)
 pY_is_1
 ```
 
-This is telling us that the model predicts that, on average, people chose the high demand task about 40% of the time when progress was held constant. To be sure that we didn't make a mistake, we can just check the same probability in our empirical data.
+This is telling us that the model predicts that, on average, people chose the high demand task about 41% of the time. To be sure that we didn't make a mistake, we can just check the same probability in our empirical data.
 
-```{r, echo=T}
+```{r empirical "G00" from m0, echo=T}
 # Because G00 is the biggie intercept, all we have to do is take the gloabl mean.
-mean(h1.data$effchoice) 
+mean(data$effchoice, na.rm =T) # na.rm=T excludes observations where effchoice==NA 
 ```
 
-As we can see, the model's predicted value and the empirical probability of choosing the high demand task are very close: about 40% in both cases. 
+As we can see, the model's predicted value and the empirical probability of choosing the high demand task are very close: about 41% in both cases. 
 
-Looking back to our model output, we can also see that  $\gamma_{00}$ is significantly different from zero according a Wald test^[`lme4` outputs Wald *z*-statistics for coefficients because they are easy to compute. However, they also rely on some sometimes suspect assumptions. I will cover assumptions of logistic multilevel models soon, but for now I point interested readers to this resource: https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#what-are-the-p-values-listed-by-summaryglmerfit-etc.-are-they-reliable. In general, this website is a useful resource for anyone fitting logistic multilevel models]. Recall, $LOR = 0$ is the same as $OR = 1$ or $p(y_{ij}) = 0.5$. Therefore, this is the same as saying that participants chose high demand decks significantly less than chance (i.e., 50% of the time). To confirm this intuition, we can also check the profile confidence intervals: 
+Looking back to our model output, we can also see that $\gamma_{00}$ is significantly different from zero according a Wald test^[`lme4` outputs Wald *z*-statistics for coefficients because they are easy to compute. However, they also rely on some sometimes suspect assumptions. I will cover assumptions of logistic multilevel models soon, but for now I point interested readers to [Ben Bolker's blog on the topic](https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#what-are-the-p-values-listed-by-summaryglmerfit-etc.-are-they-reliable). In general, this website is a useful resource for anyone fitting logistic multilevel models]. Recall, $LOR = 0$ is the same as $OR = 1$ or $p(y_{ij}) = 0.5$. Therefore, this is the same as saying that participants chose high demand decks significantly less than chance (i.e., 50% of the time). To confirm this intuition, we can also check the profile confidence intervals: 
 
-```{r, echo=T, message=F}
-h1.0.ci <- confint(h1.0, oldNames=F)
-h1.0.ci
+```{r CI for m0, echo=T, message=F}
+m0.ci <- confint(m0, oldNames=F)
+m0.ci
 ```
 
-Here we can see that the confidence interval for the log odds of choosing the high demand task does not cross zero: $\mathrm{95\% \ CI} = [-0.56, -0.26]$. Applying the same computations as earlier, this is the same as saying that the CI for choosing high demand decks overall is $[36\%, 44\% ]$. These results support our first hypothesis and show that, all else being equal, people avoid high cognitive effort tasks more than we would expect from chance (50% responding). We can see a summary of these results in **Figure 3**.
+Here we can see that the confidence interval for the log odds of choosing the high demand task does not cross zero: $\mathrm{95\% \ CI} = [-0.50, -0.25]$. Applying the same computations as earlier, this is the same as saying that the CI for choosing high demand decks overall is $[38\%, 44\% ]$. These results support our first hypothesis and show that people avoid high cognitive effort tasks more than we would expect from chance (50% responding). We can see a summary of these results in **Figure 3**.
 
-```{r, echo=F, fig.align='center', fig.cap='Results for H1'}
+```{r h1 plot, echo=F, fig.align='center', fig.cap='Results for H1'}
+h1.data <- data[data$prog_type %in% c('NoProg_NoProg', 'Prog_Prog'), ]
 y <- c('High Demand'=mean(h1.data$effchoice), 'Low Demand' = 1-mean(h1.data$effchoice))
 se <- sd(h1.data$effchoice)/sqrt(length(h1.data$effchoice))
 se <- c('High Demand'=se, 'Low Demand' = se)
@@ -302,63 +318,57 @@ thisbar <- barplot(y[2:1],
                    ylim = c(0.3, 0.7),  
                    xpd=F, 
                    ylab = 'p(Choose)', 
-                   main = 'When Progress is Held Constant (H1)')
+                   main = 'Overall Demand Preference')
 arrows(thisbar, y[2:1]-se, thisbar, y[2:1]+se, length=0.1, code=3, angle=90)
 abline(h=0.5, lty='dotted')
 ```
 
-Interestingly, we also see from this output that the CI for $\tau^2_0$ is not bound at zero, suggesting that there is significant variation between participants in how much they avoid the high demand decks overall, when progress is held constant. To quantify the degree of variation between participants in a single number, we can compute the intraclass correlation coeficient (ICC). 
+#### Computing the ICC ($\rho$)
+Interestingly, we also see from this output that the CI for $\tau^2_0$ is not bound at zero, suggesting that there is significant variation between participants in how much they avoid the high demand decks overall. To quantify the degree of variation between participants in a single number, we can compute the intraclass correlation coeficient (ICC; $\rho$). 
 
-In the context of logistic regression however, we *cannot* compute the ICC in the normal way, as $\frac{\tau^2_0}{\tau^2_0 + \sigma^2}$. Normally $\sigma^2$ represents the level-1 residuals: how much a predicted observation $\hat{y}_i$ differs from a participant $j$'s observed $y_i$. In a logistic framework however, the residuals have a different interpretation. I will discuss the residual structure of logistic models later on, but for now the key point to keep in mind is that the residuals in these models *depend on* the outcome in a way that they don't in linear models. No independent level-1 residuals means no $\sigma^2$, whicih means no immediately accessible ICC. 
-
-There are a few statistical solutions to this problem ^[see this blogpost for a good introduction and additional resources: https://www.barelysignificant.com/post/icc/. For a more scholarly source, see Goldstein & Rasbash (1996) and Goldstein, Browne, and Rashabch (2002)]. The first is quick heuristic one where we approximate $sigma^2$ by substuting it for the known variance of the *logistic distribution*. This is known as the *latent variable approach*. 
-
-$$
-\tag{`r  eqnum=eqnum+1; eqnum`} 
-ICC \ (\mathrm{aka} \ \rho) = \frac{\tau^2}{\tau^2 + \frac{\pi^2}{3}}.
-$$
-
-```{r, echo=T}
-tau2 <- summary(h1.0)$varcor$id[1] # this extracts tau2 from the model
-h1.0.icc <- tau2/(tau2 + pi^2/3)   # this computes the icc according to eq. above
-h1.0.icc
-```
-
-In other words, about 5% of the variance in participants' overall effort preferences stems from individual differences between participants. Importantly, this method assumes that our outcome variable represents a dichotomous "cut-off" of some underlying continuous variable. For example, "healthy" or "sick" are cutoffs for otherwise continuous measures of health. This assuption is what allows us to use the variance from the (continuous) logistic distribution in place of $\sigma^2$. 
-
-An approximation method that is more agnostic towards the theory underlying our data is a *simulation-based approach*. Here, we use the estimates from our model to simulate a large number of expected level-1 probabilities, using $\tau^2_0$ as a "hyperparameter" (basically the standard deviation for our simulated distribution). With this, we compute a Bernouilli variance for each simulated probability: $var_{ij} = p_{ij}(1-p_ij)$. We then take the mean of these variances and compute the ICC as follows:
+In the context of logistic MLM, there are some caveats when interpreting the ICC. Recall, the basic equation for the $\rho$ is 
 
 $$
 \tag{`r  eqnum=eqnum+1; eqnum`} 
-\rho = \frac{Var(p_{sim})}{Var(p_{sim}) + \frac{1}{N}\sum{var_{sim}}}
+\rho = \frac{\tau^2_0}{\tau^2_0 + \sigma^2}
 $$
-```{r, echo=T}
-N <- 1e5 # number of simulations (some big number)
 
-# 1. Sample a bunch of G00 from a normal distribution with mean = G00 and SD = tau2_0
-G00_sim <- rnorm(N, mean=G00, sd=tau2)
+The issue is that in logistic MLM, $\sigma^2$is determined by the data, such that $\sigma^2 = p(y_{ij}=1)\left(1-p(y_{ij}=1)\right)$. There are two ways around this "problem"^[This isn't totally true. Other approaches to estimating the ICC do exist. See this [blogpost](https://www.barelysignificant.com/post/icc/) for some simulation and Bayesian approach, or for a more scholarly source, see Goldstein & Rasbash (1996) and Goldstein, Browne, and Rashabch (2002)]. 
 
-# 2. Turn these G00_sim into probabilities using our equation:
-# p(y_ij=1)_sim <- exp(G00_sim)/(1+exp(G00_sim)) 
-p_sim <- exp(G00_sim)/(1+exp(G00_sim))
+The first is to estimate the variance directly from the estimated cluster-level probabilities. Each participant $j$ deviates from $\gamma_{00}$ by some value $U_{0j}$. Let's call participant $j$'s probability of selecting the high demand task $P_j$. We can extract a vector of $P_j$ for all participants by computing $\frac{(\gamma_{00} + U_{0j})^e}{1+(\gamma_{00} + U_{0j})^e}$. Because $\sigma^2_j$ depends on each cluster's $P_j$ according to $\sigma^2_j = P_j(1-P_j)$, we assume that the group level value is the mean of these variance: $\hat{\sigma}^2 = \frac{1}{j}\sum{\sigma^2_j}$. We then use this estimated $\hat{\sigma}^2$ to compute the ICC regularly, using equation 7. In R, we can do this as follows:
 
-# 3. Compute the Bernouilli variance for each of these probabilities
-v_sim <- p_sim * (1-p_sim)
+```{r icc method 1, echo=T}
+tau20 =  summary(m0)$varcor$id[1] # extracts tau20 from the model
+u0j = coef(m0)$id                 # extract the U0js and add to G00
+pj = exp(u0j)/(1+exp(u0j))        # compute the probability for each participant from LOR
+sigma2_j = pj*(1-pj)              # compute var(Rij) for participant j
+sigma2_est = mean(sigma2_j[,1])   # sigma^2 = mean(var(Rij))
 
-# 4. Take the mean of these Bernouilli variances
-meanv_sim <- mean(v_sim)
-
-# 5. Compute ICC as above
-ICC <- var(p_sim)/(var(p_sim) + meanv_sim)
-ICC
-
+ICC_method1 = tau20/(tau20+sigma2_est)
+ICC_method1
 ```
 
-Applying this technique we get a much lower estimate of the ICC, where the variation between participants' effort preferences when progress is held constant is now only about 1%, down from 5% with the previous technique. A downside to this approach is that the ICC is always conditional. In our case, we had no predictor variables other than the intercept, $\gamma_{00}$, but if we did have predictors we would need to include them and their dummy coding in step 2 of the R code. This means that the ICC is always conditional upon the included covariates (which may be of interest to you, of course!)
+This method suggests that 39% of the variance in people's effort avoidance stems from individual differences between participants. This is not an outlandish number, given past work suggesting that people differ in how much they avoid effort investments (e.g., Sandra & Otto, 2018). The downside to this approach is that it only accurately estimates $\sigma^2$ for models without predictor variables. Fortunately, the current model is a null model containing only one fixed effect, $\gamma_{00}$. As we will see however, the ICC will not be of much use to use moving beyond this null model. 
 
-It's difficult to judge which of these approaches are best overall and will come down to the assumptions of your data set and what you are aiming to test. In the current data, we can look at the variation in $\gamma_{00}$ directly from the data. These are summarised in **Figure 4** for a better sense of theparticipant-level differences in effort preference when progress is held constant
+A second method works for any number of fixed effects, but makes stronger assumptions about the underlying nature of the outcome variable. The *threshold model* (Snijders & Bosker, 2012) assumes that the dichotomous outcome variable, $y_{ij}$ reflects the cut-off from an unobserved continuous variable. For instance, "depressed (1) vs. not-depressed (0)" is a binary variable that represents a continuous construct (amount of depression). If this assumption is reasonable, then the level-1 residuals, $R_{ij}$, be be assumed to follow a logistic distribution for which the variance is known and fixed as $\frac{\pi^2}{3}$. As such, we can compute the ICC as follows: 
 
-```{r, echo=F, fid.width=3, fig.align='center', fig.cap='Individual variation for 6 participants in demand preference, when progress is held constant (H1)'}
+$$
+\tag{`r  eqnum=eqnum+1; eqnum`} 
+\rho = \frac{\tau^2}{\tau^2 + \frac{\pi^2}{3}}.
+$$
+
+```{r icc method 2, echo=T}
+ICC_method2 <- tau20/(tau20 + pi^2/3)
+ICC_method2
+```
+
+In other words, about 5% of the variance in participants' overall effort preferences stems from individual differences between participants.
+
+Both methods give rather different results, owing in part to the fact the latter makes an assumption about the underlying structure of our data that isn't substantiated: in the current task, people are choosing between categories of effort and thus it may be unreasonable to assume this reflects a continuous underlying variable. On the other hand, the threshold model allows us to extend the ICC computation to more complex models. 
+
+In the current model, we can look at the variation in $\gamma_{00}$ directly from the data for a better sense of participant-level differences in effort preference. These are summarised in **Figure 4**^[I include only 6 participants for space, but the results generalize to larger samples of participants.].
+
+```{r u0js plot, echo=F, fid.width=3, fig.align='center', fig.cap='Individual variation for 6 participants in demand preference, when progress is held constant (H1)'}
 
 layout(matrix(1:6, 3, 2, byrow=T))
 for(id in sample(h1.data$id, size = 6)) {
@@ -377,232 +387,156 @@ for(id in sample(h1.data$id, size = 6)) {
 }
 ```
 
+In light of these (albeit limited) group of results, it seems we have rather apparent variation in effort avoidance among participants. The first value for $\rho$ we found (39%) seems more appropriate in this case. 
 
 ### H2
-We can test H2 using much of the same techniques we did for H1. Namely, we will do the following: 
-* Subset the data to select for trials where demand is held constant (people choose only between whether they prefer progress or no progress); 
-* Fit a model that predicts people's progress preferences (`progchoice`) from $\gamma_{00}$;
-* Compute the ICC; 
-* Interpret the output. 
+#### Fitting and Comparing the Model
+To assess whether our data support H2, we need to add a predictor to our previously null model. Specifically, we need to estimate the following model
 
 $$
 \tag{`r  eqnum=eqnum+1; eqnum`} 
-log\left(\frac{p(\mathrm{progchoice}_{trial, id} = 1)}{1-p(\mathrm{progchoice}_{trial, id}=1)}\right) = \gamma_{00} + U_{0id} + R_{trial, id}
-$$
-```{r, echo=T}
-# 1. Subset data
-# only include trials where demand is the same (so effchoice is NA)
-h2.data <- data[is.na(data$effchoice), ] 
-
-# Fit the model
-h2.0 <- glmer(progchoice ~ 1 + (1|id), data=h2.data, family='binomial')
-summary(h2.0)
-```
-
-Here, we see that across demand levels, the log odds for people prefering progress decks to non-progress decks is positive and significant. Using the same steps as earlier we can convert these log odds to a probability and check how closely they match up to what we observe in the data. 
-
-```{r, echo=T}
-# Convert log odds to probabilities 
-G00 = summary(h2.0)$coefficients[,'Estimate'] # this store G00
-OR = exp(G00)
-pY_is_1 = OR/(1+OR)
-paste0('estimated p_ij = ', pY_is_1)
-
-# Check empirical probability 
-paste0('empirical p_ij = ', mean(h2.data$progchoice))
-```
-
-Again, these match up very closely and tell us that across demand levels, people selected progress decks about 62% of the time and this was significantly more than we would expect from chance (50%). To double-check this significance test, we can compute profile confidence intervals again. 
-
-```{r, echo=T}
-h2.0.ci <- confint(h2.0, oldNames=F)
-h2.0.ci
-```
-
-Here too, we see that the 95% CI for $\gamma_{00}$ does not cross 0 and, in probability terms, predicts with 95% confidence that people's true progress preference in the population is within [57%, 67%]. These results support our second hypothesis and show that, all else being equal, people prefer progress information. These data are summarised in **Figure 5**.
-
-```{r, echo=F, fig.align='center', fig.cap='Results for H2'}
-
-y <- c('No Progress'=1-mean(h2.data$progchoice), 'Progress' = mean(h2.data$progchoice))
-se <- sd(h2.data$progchoice)/sqrt(length(h2.data$progchoice))
-se <- c('No Progress'=se, 'Progress' = se)
-thisbar <- barplot(y, 
-                   ylim = c(0.3, 0.7),  
-                   xpd=F, 
-                   ylab = 'p(Choose)', 
-                   main = 'When Demand is Held Constant (H2)')
-arrows(thisbar, y-se, thisbar, y+se, length=0.1, code=3, angle=90)
-abline(h=0.5, lty='dotted')
-
-```
-
-We again notice significant variation in this preference between individuals, as indexed by the 95% CI for $\tau^2_0$ not being bounded at 0. To quantify this, we compute the ICC using the latent variable approach, but interested readers are welcome to try the simulation approach as well. 
-
-```{r, echo=T}
-tau2 <- summary(h2.0)$varcor$id[1]
-h2.0.icc <- tau2/(tau2 + pi^2/3)
-h2.0.icc
-```
-
-This tells us that about 7% of the variance in participants' progress preferences is explained by individual differences that exist between participants. As before, we can get an intuition for this by simply looking at the data for different participants when demand is held constant (see **Figure 6**). 
-
-
-```{r, echo=F, fid.width=3, fig.align='center', fig.cap='Individual variation for 6 participants in progress preference, when demand is held constant (H2)'}
-
-layout(matrix(1:6, 3, 2, byrow=T))
-for(id in sample(h2.data$id, size = 6)) {
-  d.id <- h2.data[h2.data$id==id, ]
-  y <- c('Progress'=mean(d.id$progchoice), 'No Progress' = 1-mean(d.id$progchoice))
-  se <- sd(d.id$progchoice)/sqrt(length(d.id$progchoice))
-  se <- c('Progress'=se, 'No Progress' = se)
-  thisbar <- barplot(y[2:1], 
-                     ylim =c(0,1),  
-                     xpd=F, 
-                     ylab = 'p(Choose)', 
-                     main = paste0('participant: ', id))
-  arrows(thisbar, y[2:1]-se, thisbar, y[2:1]+se, length=0.1, code=3, angle=90)
-  abline(h=0.5, lty='dotted')
-  
-}
-```
-
-### H3
-Finally, we can test H3. To do so, we can use a similar approach to above, but will require more models than before to arrive at a conclusion. Specifically, we want to test the hypothesis when both demand and progress options vary, `effchoice` depends on the interaction between progress pairing and demand pairing. First, let's subset the data. 
-
-```{r, echo=T}
-# 1. Subset the data
-# We include trials where progress and demand vary and we exclude cases where demand is held constant (i.e., when effchoice == NA)
-h3.data <- data[data$prog_type %in% c('NoProg_Prog', 'Prog_NoProg') & !is.na(data$effchoice), ]
-```
-
-Because the labels are tricky, remember that `NoProg_Prog` refers to the situation where the progress deck is also the harder of the two and `Prog_NoProg` refers to when the no progress deck is the harder of the two. The trick here is to remember that whatever comes after the `_` in the variable name is the type of deck that is the harder of the two. 
-
-With our subsetted data on hand, we can fit a null model as before. 
-
-$$
-\tag{`r  eqnum=eqnum+1; eqnum`} 
-log\left(\frac{p(\mathrm{effchoice}_{trial, id} = 1)}{1-p(\mathrm{effchoice}_{trial, id}=1)}\right) = \gamma_{00} + U_{0id} + R_{trial, id}
+log\left(\frac{p(\mathrm{effchoice}_{ij} = 1)}{1-p(\mathrm{effchoice}_{ij}=1)}\right) = \\
+ \sum_{h=1}^k\gamma_{h0}prog\_type_{ij} + R_{ij}
 $$
 
-```{r, echo=T}
-# 2. Fit the null model
-h3.0 <- glmer(effchoice ~ 1 + (1|id), data=h3.data, family='binomial')
-summary(h3.0)
+Recall, `prog_type` is dummy coded, such that it will have a value of 1 when a given `prog_type` is present and 0 when it is not. Thus, $\gamma_{h0}$ will represent the log odds of choosing a high demand deck when choosing between decks of a given `prog_type` (e.g., the log odds of choosing the high demand deck in a `Prog_NoProg` pairing). Notice that there is no $\gamma_{00}$ (and therefore no $U_{0j}$ in this equation. When dummy coding variables, the inclusion of a grand ("biggie") intercept will make it so all fixed effects $\gamma_{h0}$ represent the deviation from this intercept. This is not what we want. Instead, we want to know whether `effchoice` is significantly different from *chance* in each `prog_type`. To do so, we want to "delete" the intercept, so we are left with tequation 9. To fit this model in R, we do the following
+
+```{r m1 fit, echo=T}
+m1 <- glmer(effchoice ~ 0 + prog_type + (1|id), data=data.no.na, family='binomial')
 ```
 
-Here we see a similar effect as before: overall people are effort averse and significantly prefer the low demand task ($p(effchoice = 1) = 0.42$).However, this is not enough to address H3 on its own. What we are interested in is whether this overall demand avoidance is moderated by `effort_type` and `prog_type`. To test this, we need to fit additional models to test the significance of these predictors. The next model we need to consider is one that predicts the likelihood of choosing a high demand task from the demand pairing^[If this matrix notation is confusing to you, see the bonus material.]. 
+By adding the `0` into `glmer`'s equation, we "deleted" the intercept, such that each coefficient will be tested against zero with a Wald *z*-test.
 
-\begin{equation}
-\tag{`r  eqnum=eqnum+1; eqnum`}
-\mathrm{
-\mathbf{Y} = \mathbf{X} \mathbf{B} + \mathbf{Z}\mathbf{u} +\mathbf{R}
-}\\
-\mathrm{\mathbf{X} = \mathbf{Z}} = 
-\underbrace{
-\begin{bmatrix}
-0 & 0 & 1 & 0 & 0 \\
-0 & 0 & 0 & 1 & 0 \\
-0 & 0 & 1 & 0 & 0 \\
-&&...
-\end{bmatrix}
-}_\mathrm{effort\_type \ dummy \ codes \ }
-\end{equation}
+Before looking at the output though, we need to test whether this model significantly outperformed the null model. That is, was there a significant effect of `prog_type` on `effchoice` overall? To do so, we can start with a likelihood ratio test (LRT). 
 
-```{r, echo=T}
-# Fit model with effort_type as predictor
-h3.1 <- glmer(effchoice ~ 0 + effort_type + (1|id), data=h3.data, family='binomial')
-```
-Notice that in this code we have 0 in the fixed-effects portion formula. Without this zero, the intercept of our model will be the dummy-coded intercept, which we specified to be `LH`. If this were the case, all the resultant coefficients would be compared to this level of `effort_type`. This isn't what we want. Instead, what we want is to treat every coefficient *"like an intercept"*, where the estimates and significance tests reflect when these coefficients differ from zero (i.e., chance responding, because $LOR = 0 = OR=1 = p_{ij}=0.5$). Adding the 0 in the formula accomplishes this by telling `glmer` to "delete" the intercept and treat each coefficient as its own intercept, where the contrast is between that coefficient and zero. It's important to note however that this **only applies to the fixed effects** and that the random intercepts with variance $\tau^2_0$ will still use the dummy coded reference point. In other words, the $U_{0j}$ will be the deviations from $\gamma_{00}$, as if $\gamma_{00}$ referred to `LH`, as in our original dummy coding scheme. This is fine for our purposes, because we are less interested in this variation. Even if we were, this would be an interesting variable, since past work has focused on this pairing before (Kool et al., 2010). 
-
-Before looking into any effects of this model, we first need to see whether the inclusion of `effort_type` improved the model's fit. That is, whether there is a significant overall effect of `effort_type` on `effchoice`. To do so, we will begin by using a likelihood ratio test (LRT).
-
-```{r, echo=T}
-# LRT on the null vs. effort_type model
-anova(h3.1, h3.0)
+```{r lrt: m0 vs. m1, echo=T}
+anova(m1, m0)
 ```
 
-Firstly, notice how we did not have to specify or refit the model with `REML = F`. This is because it is not possible to use restricted maximum likelihood to estimate logistic multilevel models; it is by default, and must be, maximum likelihood. Provided that models are nested, this also means we can conduct a LRT without any  refitting. 
+As we can see from this output, the deviance in `m1` was dramatically reduced compare to `m0`, suggesting that the data are more likely under `m1` than `m0` ($\chi^2(3) = 96.54, p < .0001$). This finding supports the idea that `prog_type` significantly affects `effchoice`; in words: people's effort preferences depend on progress feedback. 
 
-The LRT suggests that there is no overall effect of `effort_type` on `effchoice`: people are equally demand avoidant in all demand pairings, compared to the null model. 
+Can we find converging evidence that agrees with the LRT? As discussed earlier, $\sigma^2$ in logistic models are fixed and depend on the outcome. As such we cannot compute a $R^2$ for a null model to demonstrate improved variance accounted for^[Though we can do this for `m1`, which we will see in a moment]. Similarly, we cannot compute a reduction in residual level-1 variance, because it will be the same in both models: $\frac{\pi^2}{3}$ As an alternative to these tests, we can turn to parametric bootstrapping. 
 
-As previously mentioned, logistic models do not have an independent residual variance term ($\sigma^2$). As such we cannot compute a pseudo-$R^2$ value to back up this finding. Similarly, because all our predictors are categorical, profile CI won't help us either, because they will not provide a test for the overall effect of `effort_type`. Alternatively, we can turn to parametric bootstrapping, which can be easily implemented using the `pbkrtest` package. 
+The goal in bootstrapping is to repeatedly simulate data from `m0` and `m1`, compute the differences between the deviances of the models for each simulated data set, and compare the observed deviance differences to a null ($\chi^2$) distribution. This is computationally intensive, but can give us a second piece of evidence to support the conclusion from our LRT, in lieu of the $R^2$ comparisons and variance reductions. Parametric bootstrapping in R can be easily implemented using the `pbkrtest` package. 
 
-```{r, echo=T, warning=F, message=F}
+```{r bootstrapping, echo=T, warning=F, message=F}
 # Load the package
 library(pbkrtest)
 
 # Use the PBmodcomp function in the same way you would the anova function
 # This can take awhile; for now we will set nsim to a smaller number to get a faster, but less precise, estimate, for the sake of illustration. In the real-world, you'll want to set this number to a larger value (e.g., at least 1000). 
-h3.1.0.pb <- PBmodcomp(h3.1, h3.0, nsim=150)
-h3.1.0.pb
+# Watch out! The order of the models matter: more complex, less complex
+m0.m1 <- PBmodcomp(m1, m0, nsim=150) 
+m0.m1
 ```
 
-What we have just done is repeatedly simulate data from `h3.1` and `h3.0`, compute the differences between the deviance of models for each simulated data set, and compare this null distribution to the observed deviance difference. This is computationally intensive, but can give us a second piece of evidence to support the conclusion from our LRT, in lieu of the traditional profile CI and pseudo $R^2$. As we can see, both the bootstrap test and the LRT are in agreement: no significant effect of `effort_type`. 
+The bootstrapping procedure supports the conclusions from the LRT. Namely, `prog_type` significantly predict `effchoice`. 
 
-We can use the same procedure as above to test for the effect of `prog_type` on `effchoice`. 
+#### Interpreting the Fixed Effects
+Now that we have confidence that we should include `prog_type` in the model, we can look at the model output. 
 
-```{r, echo=T, warning=F, message=F}
-# Fit model with prog_type as a predictor
-h3.2 <- glmer(effchoice ~ 0 + prog_type + (1|id), data=h3.data, family='binomial')
-
-# Compare model to null using LRT
-anova(h3.2, h3.0)
-
-# Compare model to null using parametric bootstrapping 
-h3.2.0.pb <- PBmodcomp(h3.2, h3.0, nsim=150)
-h3.2.0.pb 
-
-# Look at the model summary
-summary(h3.2)
+```{r m1 output, echo=T}
+summary(m1)
 ```
 
-We can see that both the LRT and bootstrapping approach tell us that `prog_type` significantly predicts `effchoice`. By looking at the model output, we can see that when the progress decks are also the lower demand decks of the pair (`Prog_NoProg`), people overwhelmingly prefer them ($p(effchoice=1) = 0.30$), whereas when progress comes at a higher cognitive cost (`NoProg_Prog`), people are statistically indifferent to choosing between high and low demand and our $p$-value suggests even a marginal trend towards effort preference ($p(effchoice=1) = 0.54$). These results support H3. 
+The first thing to notice is the lack of intercept. We explicitly coded for this when we included `0` in our model equation. Each coefficient represents the log odds of choosing the high demand deck in each `prog_type`. To begin, let's convert these into an interpretable metric.
 
-Finally, we can consider the interaction between `effort_type` and `prog_type` on `effchoice`. The process here is largely the same, except now we have an interaction term `effort_type:prog_type`. Note here the `:`. We use `:` instead of `*` because at this level we are interested in participants' choices for each deck pairing relevant to H3 (since each deck pairing has both a value for `effort_type` and `prog_type`). Using the `*` would be making the assumption that we have some "main effect" for `prog_type` and a separate "main effect" for `effort_type`, as well as the interaction. Instead, what we want is people's probability of choosing the high demand deck in each individual deck pairing and whether this probability is significantly different from chance ($LOR = 0$ or $OR=1$ or $p_{ij}=0.5$). To fit this model, we do apply the same steps as above. 
+```{r m1: GXX to probs, echo=T}
+m1.fixedEffects = as.data.frame(summary(m1)$coefficients) # store the fixed effects
 
-```{r, echo=T, message=F, warning=F}
-# Fit model with interaction term
-h3.3 <- glmer(effchoice ~ 0 + effort_type:prog_type + (1|id), data=h3.data, family='binomial')
-
-# Compare model to null using LRT
-anova(h3.3, h3.2)
-
-# Compare model to null using parametric bootstrapping 
-h3.3.2.pb <- PBmodcomp(h3.3, h3.2, nsim=150)
-h3.3.2.pb 
-
-# Look at the model summary
-summary(h3.3)
+# Transform log odds into probabilities using equation 4
+# Store these in a new column
+m1.fixedEffects$Probabilities <- exp(m1.fixedEffects$Estimate)/(1+exp(m1.fixedEffects$Estimate))
+m1.fixedEffects
 ```
 
-Again, we see good agreement between the LRT and bootstrap. Both suggest that this model outperforms the `prog_type` only model. If we look at the model output, we can see that people significantly avoid demand in `Prog_NoProg` decks and are indifferent or prefer demand in `NoProg_Prog` decks. In particular, we see that the only significant *preference* for demand is in the `LH` and `NoProg_Prog` deck. This makes sense: progress is most valuable for motivating hard mental work in contexts of low demand, where whichever deck someone chooses, they won't work have to work exceptionally hard (either low or medium demand). These results are summarised in **Figure 7**. 
+We now have a probabilities column that indicate the probability of choosing the high demand deck in each progress pairing. Already, we can see a pattern. Namely, the predicted probability of choosing a high demand deck is below 50% for all `prog_type` except `NoProg_Prog`. Recall, this label means deck pairings for which participants had to choose between a deck that yielded progress, but was more demanding, and a deck that did not yield progress, but was easier. Looking to the significance tests, we see that participants were significantly demand avoidant in all deck types except the `NoProg_Prog` type according to a Wald `z`-test, in which there was a non-significant trend for demand-seeking behaviour! To support these results, we can also compute profile confidence intervals. 
 
-```{r, echo=F, fig.align='center', fig.caption='Results for H3'}
-y  <- tapply(h3.data$effchoice, list(as.character(h3.data$prog_type), as.character(h3.data$effort_type)), mean)
-se  <- tapply(h3.data$effchoice, list(as.character(h3.data$prog_type), as.character(h3.data$effort_type)), function(x) sd(x)/sqrt(length(x)))
-
-thisbar <- 
-  barplot(y, 
-          beside=T,
-          xlab = 'Demand Pairing', 
-          ylab = 'p(Choose High Demand)', 
-          ylim = c(0.2, 0.9), 
-          xpd = F,
-          main='Demand and progress vary (H3)', 
-          legend.text = T, 
-          col = c('#1e2625', '#828c84'), 
-          args.legend = list(legend = c('High demand yields progress', 'Low demand yields progress'))
-          )
-arrows(thisbar, y-se, thisbar, y+se, code=3, angle=90, length=0.1)
-abline(h=0.5, lty = 'dashed')
+```{r m1 ci, echo=T}
+m1.confint <- confint(m1, oldNames=F)
+m1.confint
 ```
 
+For the fixed effects, we see that while the interval for `NoProg_Prog` crosses zero, it is very near zero, which in this case reflects indifference to demand when demand is accompanied by progress information. Altogether, these results support H2 and are summarised in **Figure 5**
 
-# Diagnostics for Logistic MLM
-With a better sense now of how logistic models are fit and how to interpret them, we can turn to diagnostics. Many of the assumptions are the same as linear MLM, but there are some unique ones to logistic MLM. To illustrate these logistic-specific assumptions, we'll use `h3.3` as an example model. 
+```{r h2 plot, echo=F, fig.align='center', fig.cap='Results for H2'}
+y <- tapply(data.no.na$effchoice, data.no.na$prog_type, mean)
+y <- sort(y, decreasing = T)
+se <- tapply(data.no.na$effchoice, data.no.na$prog_type,
+             function(x) sd(x)/sqrt(length(x)))
+se <- se[match(names(se), names(y))]
 
-## Level-1 Residuals Are Random
-Unlike linear regression, we cannot interpret the level-1 residuals from the model in the same way as usual: 
+thisbar <- barplot(y, 
+                   ylim = c(0.2, 0.6),  
+                   xpd=F, 
+                   ylab = 'p(Choose High Effort)', 
+                   main = 'Demand Preference Depending on Progress')
+arrows(thisbar, y-se, thisbar, y+se, length=0.1, code=3, angle=90)
+abline(h=0.5, lty='dotted')
+
+```
+
+#### Random Effects
+Returning to the model output, we can see that despite "deleting" the intercept in our model equation, we still get a value for $\tau^2_0$. It might be intuitive to think that this variance in random intercepts ($U_{0j}$) reflects variation between participants in our dummy coded intercept for `prog_type`: `NoProg_Prog`. But this isn't the case. Recall in equation 9 that we don't have an intercept for which to estimate variance around. As far as I can tell, this value is uninterpretable and doesn't correspond to estimated log odds for participants' effort preferences when `prog_type` = `NoProg_Prog` nor the overall odds of a participant favouring effort (as in `m0`)^[We can check this directly using the `ranef()` function, converting the random effects for each subject to estimated probabilities, and comparing these probabilisitc $\hat{\beta}^{EB}_j$ to the empirical probabilities from our data. If we do so, we will see that they do not match at all.]. Instead, if we want to explore the model's estimated random effects for each participant, we have to fit a random slopes model, where each random coefficient codes for the random effects when `prog_type` is a given level (e.g., `NoProg_NoProg`). Since `prog_type` has four levels, doing this radically increases the number of estimated parameters in our model and can easily lead to convergence issues. To circumvent this, it is prudent to constrain the random effects covariance matrix, since we are not interested in the correlation between levels of `prog_type`. Unfortunately, `lme4` offers no built-in way to do this. Specifically, when the random slopes come from a numeric variable, we can constrain the covariance matrix by using `||` instead of `|`. When the slopes variable is a factor however, this is not possible and `lme4` will simply ignore the `||`. Instead, we can use the `lmer_alt` function from the `afex` package, which transforms all factors into numeric variables in a way that preserves their structure prior to fitting the model with `lme4`. In R: 
+
+```{r afex demo, echo=T}
+# Don't load afex directly--it can interfere with some lme4 functionality
+m1.slopes.nocov <- afex::lmer_alt(effchoice ~ 0 + prog_type + (0+prog_type||id),
+                                  data=data.no.na, family='binomial')
+summary(m1.slopes.nocov)
+
+# Bonus: if you fit the random slopes model with glmer directly, without constraining the covariance matrix, it will fail to converge.
+# commented out because it is slow to fit.
+
+# m1.slopes.cov <- glmer(effchoice ~ 0 + prog_type + (0+prog_type|id), data=data.no.na, family='binomial')
+
+
+```
+
+There are two things to notice in the code above. First, that the inclusion of `||` now works to constrain the covariance matrix and we added the `0` in the random effects as well to keep the output interpretable. The output from this model is slightly different than that from `m1`, but the general story is the same: people avoid effort in all progress pairings but `NoProg_Prog`. The random effects show the variance estimates for each progress pairing. In other words, how much does demand avoidance vary in each progress pairing. If we wanted to estimate each participant's effort avoidance in each progress pairing, we could make use of the `ranef()` function to extract the $U_{hj}$ and add these to $\gamma_{h0}$ for each participant $j$. These are not of particular interest to us for the current research question, so we will continue working with `m1` for the remainder of the tutorial. 
+
+#### $R^2$
+If we reject the assumption of the threshold model (as we did for the ICC), then I am not aware of a way to estimate $R^2$. However, if we accept it, an estimate of the amount of variance explained by the model can be made using the following equation: 
+
+$$
+\tag{`r  eqnum=eqnum+1; eqnum`} 
+R^2_{dicho} = \frac{\sigma^2_F}{\sigma^2_F + \tau^2_0 + \sigma^2}
+$$
+
+where $\sigma^2_F$ is known as the variance in the *linear predictor* for $y$. The linear predictor is computed by applying the fixed effects of our regression equation to each cluster. In our case, this means predicting each values of $y_{ij}$ from the fixed effects of our model $\gamma_{h0}$ and taking its these predictions' variance. In R, we can do this as follows. 
+
+```{r sigma2F m1, echo=T}
+# The re.form=NA tells R to not use the random effects in its predictions
+m1.linear_predictor = predict(m1, re.form=NA)
+sigma2F = var(m1.linear_predictor)
+sigma2F
+```
+
+This tells us that 15% of the variance in the model is attributable to the fixed effects' predictions. Applying equation 10, keeping in mind that $\sigma^2$ is assumed to be $\pi^2/3$, we get:
+
+```{r r2dicho,  echo=T}
+tau2.m1 = summary(m1)$varcor$id[1]
+sigma2 = (pi^2)/3
+
+r2dicho = sigma2F/sum(sigma2F, tau2.m1, sigma2)
+r2dicho
+```
+
+This tells us that our model explains only 5% of the variance in the data. This isn't too surprising, as we've only included one predictor and entirely neglected the level of demand of each choice (`effort_type`). For now, we will assume that this is fine and continue working with `m1`, because it will allow us to practice identifying issues with models that are missing terms in the next section. 
+
+# Assumptions of Logistic MLM
+With a better sense now of how logistic models are fit and how to interpret them, we can turn to diagnostics. Many of the assumptions are the same as linear MLM, because through our logistic link function we have linearlized our binary outcome. That being said, there are some unique quirkcs to assessing residuals in logistic MLM. In addition, there are some assumptions that are unique to logistic MLM. To demonstrate how the assumptions of linear MLM apply to logistic MLM, we'll use `m1` as an example model. Below I will list all of the assumptions we can test for `m1` and describe how to test them. 
+
+Before diving in, it is worth mentioning that in research this section, it became clear to me that assumption testing for binomial MLM are still under active research. Therefore, this section should not be taken as gospel and I am sure that new developments in this area are underway. What follows is just the basics. 
+
+### 1. Model is correctly specified. 
+As I mentioned earlier, I purposefully excluded `effort_type` from the model thus far in order to illustrate how to identify misspecified models. Keep this in mind moving forward. 
+
+### 2. The functional form is correct. 
+This is fine: the outcome variable is binomial and thus we use a binomial logistic model. 
+
+### 3. At level 1 the residuals are independent and normally distributed with a mean of 0 and some variance
+As we have seen, unlike linear regression, we cannot interpret the level-1 residuals from the model in the same way as usual: 
 $$
 \tag{`r  eqnum=eqnum+1; eqnum`} 
 r_{ij} = \hat{y}_{ij} - y_{ij}
@@ -621,40 +555,52 @@ r_{ij} =
   \end{cases}
 $$
 
-$\hat{y}_{ij}$ here is the predicted probability from our model; in other words the estimated likelihood $y_{ij} = 1$. By taking the log of this value, we get the log likelihood. For $y_{ij} = 0$, the interpretation is the same, but we take $1 - \hat{y}_{ij}$. This is what I meant earlier when I siad the residuals "depend on" the outcome: the value of the residuals depend on the observation. 
+$\hat{y}_{ij}$ here is the predicted probability from our model; in other words the estimated likelihood $y_{ij} = 1$. By taking the log of this value, we get the log likelihood. For $y_{ij} = 0$, the interpretation is the same, but we take $1 - \hat{y}_{ij}$. 
 
-With these residuals, we can examine the residuals plot just as we would for linear MLM, with one additional caveat. Simply plotting the predicted values against the deviance residuals would yield a plot where the points are scattered equidistant from the zero line, depending on if $y_{ij}$ is 0 or 1, as in this plot: 
+With these residuals, we can examine the residuals plot just as we would for linear MLM, with one additional caveat. Because the sign of the deviance residuals relies entirely on the binary variable $y_{ij}$ (the "if" statements in equation 12), Simply plotting the predicted values against the deviance residuals would yield a plot where the points are scattered equidistant from the zero line, depending on if $y_{ij}$ is 0 or 1, as in this plot: 
 
-```{r, echo=T}
-predicted_values <- predict(h3.3) # this predicts choice probabilities using the model paramters
+```{r deviance residuals unbinned, echo=T}
+predicted_values <- predict(m1) # this predicts choice probabilities using the model paramters
 
-dev_resids <- residuals(h3.3, type='deviance') # this computes the deviance residuals as above
+dev_resids <- residuals(m1, type='deviance') # this computes the deviance residuals as above
 
 plot(predicted_values, dev_resids)
 abline(h=0, col='red') # add a zero line in red
 ```
 
-This isn't very information. We can fix this by binning the residuals by the predicted values and averaging them. This allows us to detect if there is any systematic variation in the residuals acros the predicted values. In other words, if our residuals are truly randomly distributed (as we assumed them to be when fitting the model), we expect that the average of the deviance residuals do not vary systematically according to the predicted values. 
+This isn't very information. We can fix this by binning the residuals by the predicted values and averaging them. In other words, we arbitrarily "cut up" the x-axis into bins and take the average deviance residual within that bin. For visualization purposes, the bins might look something like this (bins not to scale): 
 
-We can create such a plot using the `arm` package in R. 
+```{r bin plot visualisation, echo=F}
+# recreate previous plot in this chunk
+predicted_values <- predict(m1) 
+dev_resids <- residuals(m1, type='deviance') 
+plot(predicted_values, dev_resids)
+abline(h=0, col='red') 
 
-```{r, echo=T}
-
-# Note: don't load the arm library if you use dplyr or other tidyverse libraries, because it can interfere with some of their functionality
-arm::binnedplot(predicted_values, dev_resids)
-
+for(i in pretty(predicted_values, n=10)) {
+  abline(v=i, col='blue', lty='dotted')
+}
 ```
 
-We can read this plot as we would any other residual plot. We expect there to be no systematic variation in the average residuals. The gray lines indicate plus and minus 2 standard-error bounds, within which we expect about 95% of the binned residuals to fall. In our case, this seems to be the case, with maybe some cause for caution for the residuals in the lower expected values. Overall though, the residuals indicate the model is not grossly misspecified. 
+This allows us to detect if there is any systematic variation in the residuals across the predicted values. In other words, if our residuals are truly randomly distributed (as we assumed them to be when fitting the model), we expect that the average of the deviance residuals do not vary systematically according to the predicted values. 
 
-## There is No Over/Underdispersion or Heteroscedasticity Present
-A key assumption of any logistic model is that the variance will match the mean of the predicted outcome variable. When using a binomial model, we assume that the variance will be the same as the expected value on the outcome from our model, which we calculate using our regression equation for observation $i$ for participant $j$. When the variance is larger than predicted by our model, we have **overdispersion**. When it is smaller, we have **underdispersion**. 
+We can create such a plot using the `performance` package in R^[This package has many useful functions for logistic MLMs. I highly recommend it to save steps for calculating, for example, the threshold model ICC (`icc()`), $R^2R (`r2()`), etc.]. 
 
-Over/underdispersion can be caused for a number of reasons. Primarily, it might suggest that the model is misfit in some way, such that the predicted values from the model are not matching up with the actual variation seen in the data. This would sugggest that we are missing some term or interaction that is important. Another issue is known as **zero-inflation**, where the data contains more zeros than the model predicts. A third reason might be that the model is misspecified and we should use some alternative function to lineralize our binomial data (something other than our logistic function). 
+```{r binned residuals, echo=T}
+library(performance)
+binned_residuals(m1)
+```
 
-As in linear MLM, we have to ensure that the variance (or rather, dispersion) in our model is not related to some other variable. In other words, we have to check whether the dispersion is evenly spread across our predictor variables. This is relatively straightforward to do as we will see below. 
+We can read this plot as we would any other residual plot. We expect there to be no systematic variation in the average residuals. The gray lines indicate plus and minus 2 standard-error bounds, within which we expect about 95% of the binned residuals to fall. In our case, we can see that the residuals aren't entirely random and only 81% of the residuals are inside the error bounds. In addition, as the predicted values of the model increase, the average residual seems to increase as well. This systematic variation suggests that our model is misspecified in some way. As I mentioned earlier, this was done on purpose to illustrate identification of this problem. In reality, we know that participants choices were made based not only on `prog_type` (the only predictor in `m1`), but also on `effort_type`, which represents the demand levels people chose from on a given trial (e.g., low demand vs. medium demand, low demand vs. high demand, etc.) By failing to include this in our model, we have unaccounted for variation^[We also quantified this unexplained variance earlier in when computing $R^2_{dicho}$]. 
 
-A powerful package to check both of these assumptions is is the `DHARMa` package. Under this framework, residuals take on a special meaning, distinct from the deviance residuals above. Quoting from the package vignette^[https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#binomial-data]: 
+## 4. There is No Over/Underdispersion or Heteroscedasticity Present
+Unlike Gaussian model, a unique assumption to logistic models is that the data are not **over/underdispered**. In models with binary outcomes, the variance is expected to be proportion to the mean of the predicted outcome variable (recall, $var(y) = p(x)p(1-x)$). In other words, if the model over- or under-shoots its parameter estimates, it will also misidentify the variance. When the observed variance is larger than the variance predicted by our model, we have **overdispersion**. When it is smaller, we have **underdispersion**. 
+
+Over/underdispersion can be caused for a number of reasons. Primarily, it might suggest that the model is misfit in some way, such that the predicted values from the model are not matching up with the actual variation seen in the data. This would sugggest that we are missing some term or interaction that is important for predicting the data. Another issue is known as **zero-inflation**, where the data contains more zeros than the model predicts. A third reason might be that the model is misspecified and we should use some alternative function to lineralize our binomial data (a different link function). 
+
+As in linear MLM, we have to ensure that the variance (or rather, dispersion) in the model residuals do not vary unevenly across our predictor variables. In other words, we have to check whether the residual dispersion is evenly spread across our predictor variables. The problem, as we have seen, is that residuals are not simple to define in a logistic framework.  
+
+To circumvent this, we can use the `DHARMa` package. Under this framework, residuals take on a special meaning, distinct from the deviance residuals discussed above above. Quoting from the package vignette^[https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#binomial-data]: 
 
 > "DHARMa aims at solving these problems by creating readily interpretable residuals for generalized linear (mixed) models that are standardized to values between 0 and 1, and that can be interpreted as intuitively as residuals for the linear model. This is achieved by a simulation-based approach, similar to the Bayesian p-value or the parametric bootstrap, that transforms the residuals to a standardized scale. The basic steps are:
 
@@ -664,136 +610,33 @@ A powerful package to check both of these assumptions is is the `DHARMa` package
 
 > 3. The residual is then defined as the value of the empirical density function at the value of the observed data, so a residual of 0 means that all simulated values are larger than the observed value, and a residual of 0.5 means half of the simulated values are larger than the observed value."
 
-In R, this process is rather simple and it is easiest to explain what we are looking for by simply simulating data using the package. For assumptions testing, we will use the most recent model we fit, namely `h3.3`. 
+In R, this process is rather simple and it is easiest to explain what we are looking for by simply simulating data using the package. 
 
-```{r, echo=T, fig.align = 'center', fig.cap='Assumption tests for logistic models with DHARMa: using h3.3'}
+```{r DHARMa, echo=T, fig.align = 'center', fig.cap='Test for over/underdispersion and homogeneity of error variance in logistic models with DHARMa'}
 # Load the package
 library(DHARMa)
 
 # 1. Simulate the residuals
-h3.3.simulation <- simulateResiduals(h3.3, plot=T)
+m1.simulation <- simulateResiduals(m1, plot=T)
 
 # 2. Look at the raw residuals if you want
-# residuals(h3.3.simulations)
+# residuals(m1.simulations)
 
 # 3. Plot residuals
-plot(h3.3.simulation)
+plot(m1.simulation)
 
 ```
 
-On the left, we see a Q-Q plot that we can largely be interpreted the same way we would interpret a regular Q-Q plot. That is, the x-axis shows the model's predicted probabilities at each quantile for $y_{ij} = 1$ and the y-axis shows the same in the observed data. Unsurprisingly, the two values coincide almost identically. This shouldn't be too much of a surprise, since all of our predictors were categorical, and so the model is simply estimating the probability of choosing the harder deck in each of the deck pairings. If you recall from an earlier example we did something similar by hand by computing the model's predicted probability against the empirical mean. Just as in that case, here we see these values match up across quantiles. Indeed, binomial data in *non-clustered* data structures (where we wouldn't need MLM) cannot be under/overdispersed at all (Hilbe, 2013). Nevertheless, in this context, it is always good to check, particularly if your predictors were continuous. 
+On the left, we see a Q-Q plot that we can largely be interpreted the same way we would interpret a regular Q-Q plot. That is, the x-axis shows the model's predicted probabilities at each quantile that $y_{ij} = 1$ and the y-axis shows the same in the observed data. Unsurprisingly, the two values coincide almost identically. This shouldn't be too much of a surprise, since all of our predictors were categorical, and so the model is simply estimating the probability of choosing the harder deck in each of the deck pairings. If you recall from an earlier example we did something similar by hand by computing the null model's predicted probability against the empirical mean. Just as in that case, here we see these values match up across quantiles. In fact, binomial data in *non-clustered* data structures (where we wouldn't need MLM) cannot be under/overdispersed at all (Hilbe, 2013). Nevertheless, in this context, it is always good to check, particularly if your predictors were continuous. 
 
 In addition, we also get a series of tests that appear in the margins of the figure. The Kolmogorov-Smirnov (KS) test shows that a non-significant value, which suggests that we should fail to reject the null hypothesis that the predicted values from the model come from a different population than the observed values. We also get a dispersion test, to check for over/underdispersion. The p-value is higher than .05, which suggests that we should fail to reject the null that there is no dispersion problem. Finally, the outlier test shows that we have no significant effects of outliers in the relationship between predicted and observed values. 
 
-On the right, we see the scaled residuals across categorical predictors: the deck pairings from `h3.3`. These categorical predictors are assigned numeric labels from 0 to 1, on the x-axis, but I am not sure why. The y-axis are the scaled residuals defined above. A scaled residual of 0.5 means that half of the simulated values were larger than the observed value. As we can see, we have no significant variation in the scaled residuals across our categorical predictors and this intuition is backed up by a Levene Test for homogeneity in the title (n.s. stands for non-significant). 
-
-## Important Note
-On the whole, our model seems to satisfy the assumptions for a logistic model. 
-
-**However, it is important to note** that grom what I can gather, specific assumptions for *multilevel* logistic or binomial regressions are actively being researched. I could not find any mentions of assumptions regarding the residual structure between level-1 and level-2, as we saw for linear regression, in specific reference to binomial logistic regression. While checking residuals, overdispersion, and homegeneity of variance are important for any logistic model, it is worth keeping in mind that these are likely not the only factors that might impact your model's fit. As such, this should be considered an **introduction** to these assumptions and not the be-all and end-all of logistic MLM diagnostics. 
+On the right, we see the scaled residuals across categorical predictors: the deck pairings from `m1`. These categorical predictors are assigned numeric labels from 0 to 1, on the x-axis, but I am not sure why. The y-axis are the scaled residuals defined above. A scaled residual of 0.5 means that half of the simulated values were larger than the observed value. As we can see, we have no significant variation in the scaled residuals across our categorical predictors and this intuition is backed up by a Levene Test for homogeneity in the title (n.s. stands for non-significant). 
 
 # Conclusion
-The goals of this tutorial were to introduce the concepts of logistic multilevel modeling. Hopefully, it has been successful in demonstrating how to implement, interpret, and utilise logistic MLMs for testing your hypotheses. 
+The goals of this tutorial were to introduce the concepts of logistic multilevel modeling using my own data as an example. In terms of our research questions, we found support for both H1 and H2, such that participants were (a) effort avoidant, but (b) this avoidance was moderated by the presence of progress feedback. In other words, people were willing to freely choose more mentally demanding tasks if these tasks contained explicit progress feedback. When they did not, people avoided them. 
 
-I did not cover everything you could do with the current dataset, for the sake of space. If anyone is interested in the larger results from the current data, don't hesitate to email me: seandamiandevine@gmail.com!
-
-# Bonus Material
-## Matrix Notation for MLM
-```{r,echo=F}
-seqnum = 0
-```
-In class, we learned that a simple linear MLM with one predictor, random intercepts, and random slopes can summarised with the following equation: 
-
-$$
-\tag{S`r  seqnum=seqnum+1; seqnum`} 
-y_{ij} = \gamma_{00} + \gamma_{10} x_{ij} + U_{0j} + U_{1j} + R_{ij},
-$$
-
-where $y$ is some continuous outcome variable, $x$ is a predictor variable, $i$ is the observation, $j$ is the cluster, $\gamma_{00}$ is the overall ("biggie") intercept term, $\gamma_{10}$ is a fixed effect for $x$ on $y$, $U_{0j}$ is a random deviation from $\gamma_{00}$ for cluster $j$, $U_{1j}$ is a random deviation from $\gamma_{10}$ for cluster $j$, and $R_{ij}$ is within-cluster residual. 
-
-This is all well and good, but isn't very concise. That is, we have to write many terms to represent even a simple model. As we see in the main text, it can be useful to represent coded categorical variables in a more concise way. To make things more compact, we can use **matrix notation** to represent the same equation: 
-
-$$
-\tag{S`r  seqnum=seqnum+1; seqnum`}
-\mathrm{
-\mathbf{Y} = \mathbf{X} \mathbf{B} + \mathbf{Z}\mathbf{u} +\mathbf{R}
-}.
-$$
-
-Here, we have abstracted away the individual coefficients and information about level 1 and level 2 (the $\gamma$, $i$, and $j$ from equation S2) into a series of vectors. $\mathrm{\mathbf{Y}}$ is a vector of the $y$ values, $\mathrm{\mathbf{X}}$ is a design matrix for the fixed effects, $\mathrm{\mathbf{B}}$ is a vector of fixed effects, $\gamma$, $Z$ is a design matrix for the random effects, $\mathrm{\mathbf{u}}$ is vector of random effects, $U_{kj}$, and $\mathrm{\mathbf{R}}$ is a vector of the normally distributed residuals, $R_{ij}$. This is more clearly illustrated when we break apart the matrix as below. Imagine there are 2 observations ($i$) in 3 groups ($j$). The resultant matrix would look like this^[the extra column of 1s in $\mathrm{\mathbf{X}}$ represents the intercept: $\gamma_{00} \times 1 = \gamma_{00}$ ]: 
-
-$$
-\tag{S`r  seqnum=seqnum+1; seqnum`}
-\underbrace{
-\begin{bmatrix}
-y_{11} \\
-y_{12} \\
-y_{21} \\
-y_{22} \\
-y_{31} \\
-y_{32} 
-\end{bmatrix}
-}_\mathrm{\mathbf{Y}} =
-\underbrace{
-\begin{bmatrix}
-1 & x_{11} \\
-1 & x_{12} \\
-1 & x_{21} \\
-1 & x_{22} \\
-1 & x_{31} \\
-1 & x_{32} 
-\end{bmatrix}
-}_\mathrm{\mathbf{X}}
-\underbrace{
-\begin{pmatrix}
-\gamma_{00} \\
-\gamma_{10} \\
-\end{pmatrix}
-}_\mathrm{\mathbf{B}} +
-\underbrace{
-\begin{bmatrix}
-1 & x_{11} \\
-1 & x_{12} \\
-1 & x_{21} \\
-1 & x_{22} \\
-1 & x_{31} \\
-1 & x_{32} 
-\end{bmatrix}
-}_\mathrm{\mathbf{Z}} 
-\underbrace{
-\begin{bmatrix}
-U_{01} & U_{11}\\
-U_{01} & U_{11}\\
-U_{02} & U_{12}\\
-U_{02} & U_{12}\\
-U_{03} & U_{13}\\
-U_{03} & U_{13}\\
-\end{bmatrix}
-}_\mathrm{\mathbf{u}} + 
-\underbrace{
-\begin{bmatrix}
-R_{11}\\
-R_{21}\\
-R_{12}\\
-R_{22}\\
-R_{13}\\
-R_{23}\\
-\end{bmatrix}
-}_\mathrm{\mathbf{R}}
-$$
-
-
-To make the link between equation S4 and S2 explicit, if we evaluate both equations when $j = 2$, we get the same outcome: 
-
-
-\begin{gather}
-\mathrm{\mathbf{Y_2} = \mathbf{X_2} \mathbf{B} + \mathbf{Z_2}\mathbf{u_2} +\mathbf{R_2}} \nonumber \\
-= \nonumber \\
-y_{i2} =  \gamma_{00} + \gamma_{10}x_{i2} + U_{02} + U_{12} + R_{i2}. \nonumber
-\end{gather}
-
-
-This may seem like many steps to arrive at basically the same conclusion, but keeping this compact notation in mind helps when we have to represent many categorical variables with many levels in equations. To do so, we would could summarise all the $\gamma_{1x}$ with the simple **B** vector and all the coded categorical variables by the **X** and **Z** matrices. Furthermore, for pedagogical purposes, this matrix notation also shows up often in the literature, so it is helpful to know how it relates to the material we covered in class.  
+Hopefully, this tutorial has been successful in demonstrating how to implement, interpret, and utilise logistic MLMs for testing your hypotheses. As I mentioned, I did not cover everything to do with the current dataset, for the sake of space and fr pedagogical reasons (i.e., showing how to idenitify misspecified models through binned residual plots). Specifically, I only looked at a one predictor model (`prog_type` in `m1`), beyond the null model (`m0`). In the full analyses for this project, I also consider the role of `effort_type` and its interaction with `prog_type`. If these are results are of interest, and you believe the current tutorial isn't too long to include them, please let me know in the Discussion Board and I can add them to the tutorial. If you are interested in anything to do with the project or have any questions, don't hesitate to [email me](mailto:seandamiandevine@gmail.com). 
 
 # References
 Goldstein, H., Browne, W., & Rasbash, J. (2002). Partitioning variation in generalised linear multilevel models. *Understanding Statistics, 1*. 223–232.
@@ -805,3 +648,13 @@ Hilbe, J. M. (2013). Can binary logistic models be over-dispersed?. *Jet Propuls
 Inzlicht, M., Shenhav, A., & Olivola, C. Y. (2018). The effort paradox: Effort is both costly and valued. *Trends in cognitive sciences, 22*(4), 337-349.
 
 Kool, W., McGuire, J. T., Rosen, Z. B., & Botvinick, M. M. (2010). Decision making and the avoidance of cognitive demand. *Journal of experimental psychology: general, 139*(4), 665.
+
+Long, J.S. (1997). *Regression Models for Categorical and Limited Dependent Variables*. Thousand Oaks, CA: Sage Publications.
+
+Raudenbush, S.W., Yang, M.L., & Yosef, M. (2000). Maximum likelihood for generalized linear models with nested random effects via high-order, multivariate Laplace approximation. *Journal of Computational and Graphical Statistics, 9*, 141–157. 
+
+Sandra, D. A., & Otto, A. R. (2018). Cognitive capacity limitations and Need for Cognition differentially predict reward-induced cognitive effort expenditure. *Cognition, 172*, 101-106.
+
+Snijders, T. A., & Bosker, R. J. (2011). *Multilevel analysis: An introduction to basic and advanced multilevel modeling*. Sage.
+
+
