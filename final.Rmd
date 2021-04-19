@@ -1,7 +1,7 @@
 ---
 title: "Multilevel Modeling of Categorical Data"
 author: "Sean Devine"
-date: "24-03-2021"
+date: "23-04-2021"
 output:
   pdf_document: default
   html_notebook: default
@@ -10,6 +10,7 @@ output:
 ``` {r initialize equation count, echo=F} 
 eqnum = 0
 ```
+
 
 # Preamble
 In this tutorial, I want do to four things: 
@@ -33,6 +34,7 @@ Logistic regressions are a specicial case of general linear regression models us
 To illustrate this, let's work with the following (made-up) example. Imagine we collect data on whether someone will answer "yes" or "no" to the question: "Will you go on a data with me?" We predict that their answer will depend on how beautiful the person asking is (0 = not beautiful at all to 200 = very beautiful). **Figure 1a** shows what these data might look like^[These data are simulated. Hopefully people are not this shallow in real life.]. 
 
 ```{r beauty example plots, echo=F, fig.height=6, fig.align='center', fig.cap='From binary data to linear models.'}
+set.seed(1234)
 probs = seq(0, 1, by=0.05)
 choices = sapply(1:length(probs), function(x) sample(c(0, 1), size=10, 
                                                      prob=c(1-probs[x], probs[x]), 
@@ -43,8 +45,15 @@ linreg <- lm(choices~beauty)
 linpredict <- predict(linreg)
 simreg <- glm(choices ~ beauty, family='binomial')
 simpredict <- predict.glm(simreg, newdata = data.frame(beauty=beauty), type='response')
+nbins <- 10
+beautybin <- as.numeric(cut(beauty, 10))
+choiceodds <- tapply(choices, beautybin, function(x) sum(x==1)/sum(x==0))
+choiceodds[choiceodds==Inf] <- NA
+choiceoddsIdx <- 1:length(choiceodds)  
+lmexp <- lm(choiceodds ~ 0 + I(choiceoddsIdx^2))
 
-layout(matrix(1:4, 2,2, byrow=T))
+layout(matrix(1:6, 2,3, byrow=T))
+# a. scatterplot
 plot(x=beauty, y=choices, ylab='Will you go on a date with me?', 
      yaxt='n')
 axis(2, at=c(0, 1), labels = c('0 (no)', '1 (yes)'))
@@ -53,7 +62,7 @@ text(labels='a',
      y= grconvertY(0.94,  from="nfc", to="user"), 
      xpd=T, cex=2, font=2)
 
-
+# b. linear
 plot(x=beauty, y=choices, ylab='Will you go on a date with me?', 
      yaxt='n')
 axis(2, at=c(0, 1), labels = c('0 (no)', '1 (yes)'))
@@ -63,7 +72,7 @@ text(labels='b',
      y= grconvertY(0.94,  from="nfc", to="user"), 
      xpd=T, cex=2, font=2)
 
-
+# c. sigmoidal
 plot(x=beauty, y=choices, ylab='Probability of saying yes')
 lines(simpredict)
 text(labels='c', 
@@ -71,13 +80,35 @@ text(labels='c',
      y= grconvertY(0.94,  from="nfc", to="user"), 
      xpd=T, cex=2, font=2)
 
-lor <- log(simpredict/(1-simpredict))
-plot(x=beauty, y=lor, type='l', 
-     ylab = 'LOR')
+# d. sigmoidal binned
+plot(x=beauty, y=choices, ylab='Probability of saying yes')
+lines(simpredict)
+for(b in 1:length(beauty)) {
+  bmod <- b %% (length(beauty)/nbins)
+  if(bmod == 0 | b == 1) abline(v = b, col='red', lty='dotted')
+}
 text(labels='d', 
      x=grconvertX(0.05, from="nfc", to="user"),
      y= grconvertY(0.94,  from="nfc", to="user"), 
      xpd=T, cex=2, font=2)
+
+# e. odds
+plot(choiceodds, ylab = 'Odds Ratio (yeses/nos)', xlab = 'Beauty Bin')
+lines(predict(lmexp))
+text(labels='e', 
+     x=grconvertX(0.05, from="nfc", to="user"),
+     y= grconvertY(0.94,  from="nfc", to="user"), 
+     xpd=T, cex=2, font=2)
+
+# log odds
+lor <- log(simpredict/(1-simpredict))
+plot(x=beauty, y=lor, type='l', 
+     ylab = 'Log(Odds Ratio)')
+text(labels='f', 
+     x=grconvertX(0.05, from="nfc", to="user"),
+     y= grconvertY(0.94,  from="nfc", to="user"), 
+     xpd=T, cex=2, font=2)
+
 ```
 
 As we can see, this does not look like the typical scatterplot we would get from a linear model, where the relationship between the variable on the x-axis and the y-axis is immediately clear (e.g., when $x$ goes up, so does $y$). This is because the variable on the y-axis is binary: people can only say "yes" or "no" to a date (here we have dummy coded "yes" and "no" as 1 or 0, respectively). Each point represents one answer. 
@@ -89,7 +120,7 @@ $$
 \tag{`r  eqnum=eqnum+1; eqnum`}
 Date_{i} = \beta_0 + \beta_1Beauty_i
 $$
-At first glance, this approach might seem reasonable: better-looking people get more dates. There are two problems, however. The first is rather intuitive: some values on the regression line are impossible. What would it mean for a value to exceed 1; to say "more than yes" to a date. The second is slightly more techincal. In linear regression, the variance is estimated as a free parameter ($\sigma^2$ or $\Lambda$ for a covariance matrix), but in logistic regression the variance *depends on* on the mean (i.e., the probability of an event occuring, $p$), such that $var(y_{i}) = p_i(1-p_i)$, where $p_i$ is the probability that observation $i$ is 1 (yes to a date). This means that by definition there is heteroscedasticity, because the variance is not constant across observations, which violates an assumption of linear regression and makes it inappropriate in this case.  
+At first glance, this approach might seem reasonable: better-looking people get more dates. There are two problems, however. The first is rather intuitive: some values on the regression line are impossible. What would it mean for a value to exceed 1; to say "more than yes" to a date. The second is slightly more techincal. In linear regression, the variance is estimated as a free parameter ($\sigma^2$ or $\Lambda$ for a covariance matrix), but in logistic regression the variance *depends on* on the mean (i.e., the probability of an event occuring, $p$), such that $var(y_{i}) = p_i(1-p_i)$, where $p_i$ is the probability that observation $i$ is 1 (yes to a date). This means that by definition there is heteroscedasticity, because the variance is not constant across observations, which violates an assumption of linear regression and makes it inappropriate in this case^[I will return to this point later when discussing residuals in logistic models.].  
 
 Still, there is something intuitive about the linear approach. In fact, if we changed the y-axis so that these impossible values went away, we would have something that makes more sense. To solve this problem, we can estimate the *probability* of someone saying yes to a date, rather than the binary answer. This would fixe both our problems, because probabilities are bound from 0 to 1 and are interpretable in a continuous manner. The question is how do we move from binary data to probabalistic data? Fortunately, we can use a *logistic* function to do so: 
 
@@ -100,14 +131,16 @@ $$
 
 The logistic function^[$e$ here is Euleur's constant, which is approximately equal to 2.718282] squeezes the output from our linear model to be between between 0 and 1, which we use to represent probabilities of responses being equal to 1. As an input, it takes $\eta$, which in our regression framework is the predicted value of $y$ from our linear model (i.e., the result of $\beta_0 + \beta_1Beauty_i$). We can see what this function looks like for our data in **Figure 1c**. The characteristic *S-curve* better represents our earlier intuition: the better-looking someone is, the higher probability with which they'll get a date. 
 
-While transforming our data using a logistic function fixes our the issue of impossible values on our regression line, we have lost the nice linear function we had in **Figure 1b**. As such, we cannot apply the (multilevel) *linear* techniques we have learned in class and previously in our statistical training. To move from this non-linear logistic function to a linear one, we have to "invert" this logistic function to recover the linear relationship we lost. In other words, we want to get back to something like $Date_i = \beta_0 + \beta_1Beauty_i$, while keeping interpretable values for every predicted value of $Date_i$ and solving the issue of heteroscedasticity. To do so, we can use the following equation. 
+While transforming our data using a logistic function fixes our the issue of impossible values on our regression line, we have lost the nice linear function we had in **Figure 1b**. As such, we cannot apply the (multilevel) *linear* techniques we have learned in class and previously in our statistical training. To recover our linear function (i.e., to *linearize* our logistic function), while maintaining the desirable propoerties from the logistic function, we can compute the **odds ratio of an event occuring**. Like probabilities, odds ratio are a continuous measure of likelihood. They are computed by dividing the number of times an event occurs by the number of times it does not: $\frac{\Sigma y=1}{\Sigma y=0}$. To return to our example, an odds ratio might represent how many times people say yes to a date relative to how many times they say no, depending on one's beauty. To compute this, we can create "bins" of beauty and compute the odds of saying yes in each bin, as visualised in **Figure 1d**. Remember, all we are doing here is counting the number of times people say "yes" or "no" in each bin and dividing these two values. If we visualize this, we can see that as beauty increases, the odds of saying yes to a date increase **exponentially**. Roughly, for a one-unit increase in beauty bin, the odds ratio of saying yes to a date increases by $\beta_0\beta_1^{beauty \ bin}$ (see **Figure 1e**). This is ideal for us, because it is well-known that to linearlize an exponential function, all one must do is take its (natural) logarithm. The problem is that now the x-axis has changed from a continuous beauty to beauty bins! 
+
+Finally it is time to bring everything together. To take advantage of both the exponential function of odds *and* the probabilistic logistic function we've discussed, we can compute the log of the odds ratio for our the probability of our outcome:
 
 $$ 
 \tag{`r  eqnum=eqnum+1; eqnum`}
 log\left(\frac{p(y_i = 1)}{p(1-y_i= 1)}\right) = \beta_0 + \beta_1Beauty_i
 $$
 
-Now, our outcome is no longer the probability that $y_i = 1$, but instead the the **log odds of $y_i$ being equal to 1** (which in this case means saying "yes" to a date). This is simply the natural logarithm of the probability that $y_i = 1$ (which we got from our sigmoidal function earlier) over the probability that $y_i \neq 1$. Therefore, we can easily move from log odds (LOR) to regular odds ratios (OR) to probability as follows:
+Now, our outcome is no longer the probability that $y_i = 1$, as it was in our logistic function, nor is it the raw odds, but instead the **log odds of $y_i$ being equal to 1** (which in this case means saying "yes" to a date). This is simply the natural logarithm of the probability that $y_i = 1$ (which we got from our sigmoidal function earlier) over the predicted probability that $y_i \neq 1$. Therefore, we can easily move from log odds (LOR) to regular odds ratios (OR) to probability as follows:
 
 \begin{gather}
 LOR = log\left(\frac{p(y_i = 1)}{p(1-y_i= 1)}\right) \tag{`r  eqnum=eqnum+1; eqnum`} \\
@@ -117,8 +150,10 @@ p(y_i=1) = \frac{OR}{1+OR}.\nonumber
 
 In other words, when $LOR = 0$, $OR = 1$, $p(\mathrm{\mathbf{Y}}_i=1) = 0.5$. The change in LOR will be the regression coefficients we get from a logistic regression model. Because this (log) logistic transformation "connects" our binomial data to linear functions, it is called a **link function**^[The logistic function is just one possible link function. Other functions, such as a probit function can do the same job of linking binomial data to linear functions (see Long, 1997)]. 
 
+All together, we can apply these steps to any binomial data to reach a linear model that captures the trends we are interested in (for instance, in **Figure 1f**. Namely, how the odds (which is equivalen to the probability, as we have seen) of one $y = 1$ changes depending on the value of a number of predictors. 
+
 ## Multilevel Logistic Models
-Equation 3 can easily be exteded to multilevel data now that we have a linear function to work with. The key thing to remember is that the coefficients refer to an outcome that is transformed and not in the original metric (log odds instead of probabilities). The equation for a $k$-predictor multilevel logistic model, with random intercepts and random slopes, is:
+Equation 3 can easily be exteded to multilevel data now that we have a linear function to work with. The key thing to remember is that the coefficients refer to an outcome that is transformed and not in the original metric (log odds instead of binary data). The equation for a $k$-predictor multilevel logistic model, with random intercepts and random slopes, is:
 
 $$
 \tag{`r  eqnum=eqnum+1; eqnum`}
@@ -133,7 +168,11 @@ where
  - $U_{0j}$ are the cluster-level deviation from $\gamma_{00}$ on the log-odds scale. As always, $U_{0j}$ are assumed to be independent and random, $\mathcal{N}(0, \tau^2_0)$;
  - $U_{hj}$ are the cluster-level deviation in slopes from $\gamma_{h0}$, on the log-odds scale. $U_{hj}$ are assumed to be independent and random, $\mathcal{N}(0, \tau^2_h)$;
  
-In equation 5, I include a term for $R_{ij}$, but as we saw earlier, level-1 residuals in logistic models are not a free parameter to be estimated, but rather depend on $y_{ij}$, such that $R_{ij} = p(y_{ij}=1)\left(1-p(y_{ij}=1)\right)$. For this reason, this term is usually dropped from equations and even excluded from the `lme4` output, as we will see. For completeness however, $R_{ij}$ refer to the within-cluster residuals, such that $y_{hij} = \hat{p}_{ij} + R_{ij}$, where $\hat{p}_{ij}$ is the model's predicted probability that $y_{ij} = 1$. A particular quirk of this definition of variance in the logistic model is that the variance about $R_{ij}$, a.k.a. $\sigma^2$, is sometimes assumed to be random and independent, with mean 0 and a fixed variance of $\frac{\pi^2}{3}$. I'll explain when this assumption is appropriate and where it comes from in a later section discussing the calculation of an ICC and residual variance in logistic multilevel models, but for those who are interested, see Snijders & Bosker (2012, section 17.3.3-4). 
+In equation 5, I include a term for $R_{ij}$, but as we saw earlier, level-1 residuals in logistic models are not a free parameter to be estimated, but rather depend on $y_{ij}$, such that $R_{ij} = p(y_{ij}=1)\left(1-p(y_{ij}=1)\right)$.To understand this fully, let us return to traditional linear regression. Here, each observation has a distinct residual to the regression line. For instance, if we assume that someone's muscle tone predicts their beauty relatively well, but not perfectly, and we fit a (level-1) linear model to these data, we obtain a fitted regression equation of the form $Beauty_i = \beta_0 + \beta_1Muscle_i + \epsilon$. Critically, $\epsilon$ represents some error in the estimated value for $Beauty_i$ and its true value. These values are residuals and are assumed to be normally distributed $\mathcal{N}(0, \sigma^2)$. From this example, it is clear that underlying linear regression is a normal distribution, which has two estimated parameters: a mean, $\mu$ and variance, $\sigma^2$ (or $R_{ij}$ in the context of MLM).
+
+In contrast, binary data does not assume the same underlying distribution. Rather than assuming a normal (a.k.a. Gaussian) distribution to describe our errors (i.e., a distribution with $mu$ and $\sigma^2$), we now assume a Bernoulli distribution, because our data can only take on binary values (0 and 1). Unlike Gaussian distributions, Bernoulli distributions only have one parameter, $\theta$: the probability of an event occuring, conditional on the predictors. Therefore, if we imagine the simplest Bernoulli example, where we have no predictors (i.e., a null model), then all of the information one could know about the distribution is contained within (1) the sample size and (2) $\theta$, which is directly observable in the data (e.g., the number of "yeses" to dates is plainly calculable). As a result, there is no error term, "$\epsilon$" to speak of in the same way we talk about it in a Gaussian distribution: as something that is added to or substracted from $\theta$. Rather the "variance" of a Bernouilli distribution, is entirely determined by $\theta$ according to the following equation: $var = \theta(1-\theta)$, which earlier I wrote as $p(1-p)$.^[To demonstrate why this equation is true, let $X$ be some binary variable and $\theta$ be the mean of the distribution. We begin by solving for $\theta(X^2)$ as follows: $\theta^2 = p(X=1) \times 1^2 + p(X=0)\times 0^2 = p(X=1)1 + p(X=0)0 = p(X=1) = \theta$. Following the standard equation for computing variance ($\sigma^2 = ((\Sigma X^2) / N ) - \mu^2$), keeping in mind $N$ is already captured by $\theta$ by virtue of it being a probability, we can thus compute the variance around $\theta$ as: $V(X) = \theta(X^2)-\theta^2 = \theta - \theta^2 = \theta(1-\theta)$. From this we can clearly see that the variance is just a restatement $\theta$.]. 
+
+For this reason, the within-cluster residual term, $R_{ij}$, is usually dropped from logistic MLM equations and even excluded from the `lme4` output, as we will see. A particular quirk of the definition of variance in the logistic model that we have seen is that the variance about $R_{ij}$, is sometimes assumed to be random and independent, with mean 0 and a fixed variance of $\frac{\pi^2}{3}$. I'll explain when this assumption is appropriate and where it comes from in a later section discussing the calculation of an ICC and residual variance in logistic multilevel models, but for those who are interested, see Snijders & Bosker (2012, section 17.3.3-4). 
 
 Save for $R_{ij}$, the remaining parameters ($\gamma, \tau^2$) must be estimated. How `lme4` estimates these parameters is beyond the scope of the current tutorial, but suffice it to say that we will use the default Laplace Approximation method for the remainder of this tutorial. For more information about approximation methods for hiearchical data, see Raudenbush et al. (2000). 
 
@@ -171,7 +210,7 @@ knitr::kable(deckdesc, col.names = c('Yields Progress', 'Does Not Yield Progress
 Overall then, participants were exposed to 15 unique possible deck pairings (A vs. F, B vs. C, etc.), each of which were presented 4 times throughout the experiment. These 15 pairings were fully counterbalanced, allowing for conclusions to be drawn about participants’ pure effort preferences (when a deck choice was between two no-progress or two progress decks that differed only in terms of switch rate), pure progress preferences (when a deck choice was between a no-progress deck and progress deck that had the same switch rate), and the interaction between the two (when a deck choice was between a no-progress deck and a progress deck that varied in terms of switch rate). 
 
 ### Research Question
-In summary, what we are trying to answer is whether people are willing to work mentally harder when that mental effort explicitly conveys progress information. To wit, the key variables of interest for this tutorial are participants' choices (high/low demand deck) and how these choices varied as a function of what deck pairings they were choosen from. Specifically, we will try to model whether participants' were more likely to choose one type of deck over another depending on (a) the demand pairing (how hard each available deck was) and (b) the progress pairing (whether one, both, or none of the decks gave progress feedback) on a given trial. 
+In summary, what we are trying to answer is whether people are willing to work mentally harder when that mental effort explicitly conveys progress information. To wit, the key variables of interest for this tutorial are participants' choices (high/low demand deck) and how these choices varied as a function of what deck pairings they were choosen from. Specifically, we will try to model whether participants' were more likely to choose one type of deck over another depending on the progress pairing (whether one, both, or none of the decks gave progress feedback) on a given trial. 
 
 <center>
 
@@ -477,7 +516,7 @@ abline(h=0.5, lty='dotted')
 ```
 
 #### Random Effects
-Returning to the model output, we can see that despite "deleting" the intercept in our model equation, we still get a value for $\tau^2_0$. It might be intuitive to think that this variance in random intercepts ($U_{0j}$) reflects variation between participants in our dummy coded intercept for `prog_type`: `NoProg_Prog`. But this isn't the case. Recall in equation 9 that we don't have an intercept for which to estimate variance around. As far as I can tell, this value is uninterpretable and doesn't correspond to estimated log odds for participants' effort preferences when `prog_type` = `NoProg_Prog` nor the overall odds of a participant favouring effort (as in `m0`)^[We can check this directly using the `ranef()` function, converting the random effects for each subject to estimated probabilities, and comparing $\hat{\beta}^{EB}_j$ to the empirical probabilities from our data. If we do so, we will see that they do not match.]. Instead, if we want to explore the model's estimated random effects for each participant, we have to fit a random slopes model, where each random coefficient codes for the random effects when `prog_type` is a given level (e.g., `NoProg_NoProg`). Since `prog_type` has four levels, doing this radically increases the number of estimated parameters in our model and can easily lead to convergence issues. To circumvent this, it is prudent to constrain the random effects covariance matrix, since we are not interested in the correlation between levels of `prog_type`. Unfortunately, `lme4` offers no built-in way to do this. Specifically, when the random slopes come from a numeric variable, we can constrain the covariance matrix by using `||` instead of `|`. When the slopes variable is a factor however, this is not possible and `lme4` will simply ignore the `||`. Instead, we can use the `lmer_alt` function from the `afex` package, which transforms all factors into numeric variables in a way that preserves their structure prior to fitting the model with `lme4`. In R: 
+Returning to the model output, we can see that despite "deleting" the intercept in our model equation, we still get a value for $\tau^2_0$. It might be intuitive to think that this variance in random intercepts ($U_{0j}$) reflects variation between participants in our dummy coded intercept for `prog_type`: `NoProg_Prog`. But this isn't the case. Recall in equation 9 that we don't have an intercept for which to estimate variance around. As far as I can tell, this value is uninterpretable and doesn't correspond to estimated log odds for participants' effort preferences when `prog_type` = `NoProg_Prog` nor the overall odds of a participant favouring effort (as in `m0`)^[We can check this directly using the `ranef()` function, converting the random effects for each subject to estimated probabilities, and comparing $\hat{\beta}^{EB}_j$ to the empirical probabilities from our data. If we do so, we will see that they do not match.]. Instead, if we want to explore the model's estimated random effects for each participant, we have to fit a random slopes model, where each random coefficient codes for the random effects when `prog_type` is a given level (e.g., `NoProg_NoProg`). Since `prog_type` has four levels, doing this radically increases the number of estimated parameters in our model and can easily lead to convergence issues. To circumvent this, it is prudent to constrain the random effects covariance matrix, since we are not interested in the correlation between levels of `prog_type`. Unfortunately, `lme4` offers no built-in way to do this. Specifically, when the random slopes come from a numeric variable, we can constrain the covariance matrix by using `||` instead of `|`. When the slopes variable is a factor however, this is not possible and `lme4` will simply ignore the `||`. Instead, we can use the `lmer_alt` function from the `afex` package, which transforms all factors into numeric variables in a way that preserves their structure prior to fitting the model with `lme4`. In R^[You may notice that the equation for `m1.slopes.nocov` in the model output differs slightly from the equation we entered. This is simply `lmer_alt` recoding our categorical data to numerical data so that `lmer` can understand the `||` to mean "drop the covariance". All interpretations remain the same.]: 
 
 ```{r afex demo, echo=T}
 # Don't load afex directly--it can interfere with some lme4 functionality
@@ -485,7 +524,8 @@ m1.slopes.nocov <- afex::lmer_alt(effchoice ~ 0 + prog_type + (0+prog_type||id),
                                   data=data.no.na, family='binomial')
 summary(m1.slopes.nocov)
 
-# Bonus: if you fit the random slopes model with glmer directly, without constraining the covariance matrix, it will fail to converge.
+# Bonus: if you fit the random slopes model with glmer directly, 
+# without constraining the covariance matrix, it will fail to converge.
 # commented out because it is slow to fit.
 
 # m1.slopes.cov <- glmer(effchoice ~ 0 + prog_type + (0+prog_type|id), data=data.no.na, family='binomial')
@@ -656,5 +696,35 @@ Raudenbush, S.W., Yang, M.L., & Yosef, M. (2000). Maximum likelihood for general
 Sandra, D. A., & Otto, A. R. (2018). Cognitive capacity limitations and Need for Cognition differentially predict reward-induced cognitive effort expenditure. *Cognition, 172*, 101-106.
 
 Snijders, T. A., & Bosker, R. J. (2011). *Multilevel analysis: An introduction to basic and advanced multilevel modeling*. Sage.
+
+\newpage
+
+# Revision Letter
+Peers provided helpful comments on what to improve in the tutorial. I aimed to incorporate their feedback as best as possible. 
+
+1. **Darius**: 
+
+  a. *"When explaining the steps between raw predictions, log odds, and regular odds, are there any visualizations that would help illustrate the differences between these ways of representing the outcome?"*
+
+    This information was added to the **Logistic Regressions, Probabilities, and Odds Ratios: Basics of Logistic Regressions** section. Specifically, two additional subfigures were added to **Figure 1** (**d** and **e**) to illustrate how odds ratio are computed and their exponential nature. These additional subfigures come as the direct result of a back-and-forth Darius and I had in the discussion board that aimed to determine the most accessible way to present this information in text-format. From these figures, the remainder of the explanation is relatively straightforward, building on the section's narrative of transforming binary data in a variety of ways to obtain desirable (i.e., linear) models. 
+  
+   b. *"It could be clarified at the beginning of the model construction sections that effort_type will not feature in the demo, to give a better idea of the scope upfront. I was expecting it to come up, and so it took some extra effort to keep it in mind while reading."*
+  
+    This issue was likely the result of the following sentence, which was left over from a previous version of the tutorial: "Specifically, we will try to model whether participants' were more likely to choose one type of deck over another depending on **(a) the demand pairing (how hard each available deck was)** and (b) the progress pairing (whether one, both, or none of the decks gave progress feedback) on a given trial." To correct for this, the bolded section of the sentence was removed, as well as any mention of the demand pairing variable (`effort_type`) in the context of hypothesis testing, to avoid confusion. 
+  
+  c. *"On page 12, should “some value U0j” instead use a lower-case “u”, since U0j is a random variable?"*
+
+    The tutorial has been double-checked to ensure that all $U_{0j}$ are consistenly upper-case. Personally, I find this more intuitive for the intended audience, as this is the notation we used in class throughout the semester. 
+
+
+2. **Anna**: 
+  a. *"I've been wondering why it is tricky to calculate the within-cluster variance in logistic models? Why is the p(1-p) calculation of variance impossible/inaccurate? I know that you explained this in two places in the text, so I could be missing a key point, but would be great to hear again."*
+
+    Additional information on level-1 logistic residuals has been added to the **Logistic Regressions, Probabilities, and Odds Ratios: Multilevel Logistic Models** section to address this point. Specifically, these new paragraphs address why level-1 variance in logistic models is determined by $p(y_i=1)$ in a more fine-grained manner. In-text, this is explained verbally, with analogies to linear regression for ease of comprehension. Additionally, in footnote 5, the same point is made computationally using simple-to-follow equations that should be familiar to students at this level (e.g., to compute the variance of a variable around its mean).
+    
+3. **Sophie**: 
+  a. *"In testing your 2nd hypothesis, I wondered if you could elaborate more on the random effects (page 18).  When specifying the random slopes in "m1.slopes.nocov" you had entered "0 + prog_type", but the output shows a different equation. I'm just wondering what's going on there."*
+    
+    Footnote 12 now addresses the discrepancy between the inputted model equation and the R output model equation. Specifically, the console notation is just a quirk of `afex`, but the interpretation for all effects remains the same. Hopefully this clears up confusion for any particularly sharp-eyed readers 
 
 
